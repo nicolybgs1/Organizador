@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[53]:
-
-
 import streamlit as st
 import pandas as pd
 import datetime
@@ -56,6 +53,9 @@ def rank_companies(data):
         # Regra 2: Quantidade de tanques (Quanto menor, maior prioridade)
         score -= row["Tanques"] * 10
 
+        # Regra 3: Prioridade Adicional (quanto maior o nível, maior prioridade negativa)
+        score -= row["Prioridade Adicional (Nível)"] * 50
+
         return score
 
     data["Prioridade"] = data.apply(priority_score, axis=1)
@@ -71,13 +71,23 @@ num_companies = st.number_input("Quantas companhias irão receber produto?", min
 company_data = []
 for i in range(int(num_companies)):
     st.markdown(f"### Companhia {i+1}")
-    company = st.selectbox(f"Nome da Companhia {i+1}",["POO", "PET", "SIM", "PTS", "FIC", "CJ", "TCT", "TRR", "TSO", "RM", "OPL", "CRS", "TOR", "DM", "SHE"], key=f"company_{i}")
+    company = st.selectbox(f"Nome da Companhia {i+1}", ["POO", "PET", "SIM", "PTS", "FIC", "CJ", "TCT", "TRR", "TSO", "RM", "OPL", "CRS", "TOR", "DM", "SHE"], key=f"company_{i}")
     product = st.selectbox(f"Produto {i+1}", ["GAS", "S10", "S500", "QAV", "QAV-A1", "OC"], key=f"product_{i}")
     volume = st.number_input(f"Volume (m³) a ser enviado {i+1}", min_value=0, step=1, key=f"volume_{i}")
     stock = st.selectbox(f"Companhia tem estoque? {i+1}", ["Sim", "Não"], key=f"stock_{i}")
     tanks = st.number_input(f"Quantidade de tanques {i+1}", min_value=1, step=1, key=f"tanks_{i}")
-    company_data.append({"Companhia": company, "Produto": product, "Volume": volume, 
-                         "Estoque": stock, "Tanques": tanks})
+    additional_priority = st.text_input(f"Prioridade Adicional {i+1} (Operacional ou Cliente)", key=f"add_priority_{i}")
+    additional_priority_level = st.slider(f"Nível da Prioridade Adicional {i+1} (0-10)", min_value=0, max_value=10, key=f"priority_level_{i}")
+    
+    company_data.append({
+        "Companhia": company, 
+        "Produto": product, 
+        "Volume": volume, 
+        "Estoque": stock, 
+        "Tanques": tanks,
+        "Prioridade Adicional": additional_priority,
+        "Prioridade Adicional (Nível)": additional_priority_level
+    })
 
 # Processamento dos dados
 if st.button("Organizar meu dia"):
@@ -99,7 +109,8 @@ if st.button("Organizar meu dia"):
                 "Produto": row["Produto"],
                 "Volume": row["Volume"],
                 "Início": start_time.strftime("%H:%M"),
-                "Fim": end_time.strftime("%H:%M")
+                "Fim": end_time.strftime("%H:%M"),
+                "Prioridade Adicional": row["Prioridade Adicional"]
             })
             # Adiciona intervalo de 10 minutos entre bombeios
             start_time = end_time + datetime.timedelta(minutes=10)
@@ -110,7 +121,6 @@ if st.button("Organizar meu dia"):
         st.dataframe(schedule_df)
     else:
         st.warning("Por favor, insira os dados das companhias.")
-
 
 # In[ ]:
 
