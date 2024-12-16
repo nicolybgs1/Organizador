@@ -62,7 +62,7 @@ def rank_companies(data):
     return data.sort_values(by=["Prioridade", "ProductPriority"], ascending=True)
 
 # Inicialização da interface
-st.title("Organizador Inteligente de Bombeios")
+st.title("Organizador de Bombeios")
 
 # Entrada de dados do usuário
 st.subheader("Insira os dados das companhias para o dia seguinte:")
