@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 import streamlit as st
 import pandas as pd
 import datetime
@@ -98,6 +95,24 @@ if st.button("Organizar meu dia"):
         # Ranqueamento final
         ranked_df = rank_companies(df)
 
+        # Função para mover linhas no DataFrame
+        def move_row(df, index, direction):
+            if direction == "up" and index > 0:
+                df.iloc[index], df.iloc[index - 1] = df.iloc[index - 1], df.iloc[index]
+            elif direction == "down" and index < len(df) - 1:
+                df.iloc[index], df.iloc[index + 1] = df.iloc[index + 1], df.iloc[index]
+            return df
+
+        # Exibindo as opções de movimentação de linha
+        st.subheader("Reorganizar Linhas")
+        row_to_move = st.number_input("Selecione a linha a ser movida", min_value=1, max_value=len(ranked_df), step=1) - 1
+        move_direction = st.radio("Mover para", ["Para cima", "Para baixo"])
+
+        if st.button("Mover Linha"):
+            direction = "up" if move_direction == "Para cima" else "down"
+            ranked_df = move_row(ranked_df, row_to_move, direction)
+            st.success("Linha movida com sucesso!")
+
         # Planejamento do horário dos bombeios
         start_time = datetime.datetime.combine(datetime.date.today(), datetime.time(0, 0))
         schedule = []
@@ -121,9 +136,3 @@ if st.button("Organizar meu dia"):
         st.dataframe(schedule_df)
     else:
         st.warning("Por favor, insira os dados das companhias.")
-
-# In[ ]:
-
-
-
-
