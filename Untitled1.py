@@ -68,11 +68,7 @@ st.title("Organizador de Bombeios")
 st.subheader("Insira os dados das companhias para o dia seguinte:")
 num_companies = st.number_input("Quantas companhias irão receber produto?", min_value=1, step=1)
 
-# Use session_state to store the company data across page refreshes
-if 'company_data' not in st.session_state:
-    st.session_state.company_data = []
-
-# Adiciona novos dados ao session_state
+company_data = []
 for i in range(int(num_companies)):
     st.markdown(f"### Companhia {i+1}")
     company = st.selectbox(f"Nome da Companhia {i+1}", ["POO", "PET", "SIM", "PTS", "FIC", "CJ", "TCT", "TRR", "TSO", "RM", "OPL", "CRS", "TOR", "DM", "SHE"], key=f"company_{i}")
@@ -83,8 +79,7 @@ for i in range(int(num_companies)):
     additional_priority = st.text_input(f"Prioridade Adicional {i+1} (Operacional ou Cliente)", key=f"add_priority_{i}")
     additional_priority_level = st.slider(f"Nível da Prioridade Adicional {i+1} (0-10)", min_value=0, max_value=10, key=f"priority_level_{i}")
     
-    # Adiciona dados no session_state
-    st.session_state.company_data.append({
+    company_data.append({
         "Companhia": company, 
         "Produto": product, 
         "Volume": volume, 
@@ -94,30 +89,36 @@ for i in range(int(num_companies)):
         "Prioridade Adicional (Nível)": additional_priority_level
     })
 
-# Função para remover uma linha
-def remove_row(df, index):
-    return df.drop(index)
-
 # Processamento dos dados
 if st.button("Organizar meu dia"):
-    if len(st.session_state.company_data) > 0:
-        df = pd.DataFrame(st.session_state.company_data)
+    if len(company_data) > 0:
+        df = pd.DataFrame(company_data)
         # Ajustar a prioridade de produtos
         df = adjust_product_priority(df)
         # Ranqueamento final
         ranked_df = rank_companies(df)
 
+        # Planejamento do horário dos bombeios
+        start_time = datetime.datetime.combine(datetime.date.today(), datetime.time(0, 0))
+        schedule = []
+        for _, row in ranked_df.iterrows():
+            duration = calculate_bombeio_time(row["Produto"], row["Volume"], row["Companhia"])
+            end_time = start_time + datetime.timedelta(minutes=duration)
+            schedule.append({
+                "Companhia": row["Companhia"],
+                "Produto": row["Produto"],
+                "Volume": row["Volume"],
+                "Início": start_time.strftime("%H:%M"),
+                "Fim": end_time.strftime("%H:%M"),
+                "Prioridade Adicional": row["Prioridade Adicional"]
+            })
+            # Adiciona intervalo de 10 minutos entre bombeios
+            start_time = end_time + datetime.timedelta(minutes=10)
+
         # Exibição dos resultados
         st.subheader("Bombeios Organizados por Prioridade e Horário")
-        schedule_df = pd.DataFrame(ranked_df)
+        schedule_df = pd.DataFrame(schedule)
         st.dataframe(schedule_df)
-
-        # Opção para remover uma linha
-        row_to_remove = st.selectbox("Selecione uma linha para remover", schedule_df.index)
-        if st.button("Remover Linha"):
-            st.session_state.company_data = st.session_state.company_data[:row_to_remove] + st.session_state.company_data[row_to_remove+1:]
-            st.success(f"Linha {row_to_remove} removida com sucesso!")
-            st.experimental_rerun()  # Recarregar a página para refletir a remoção
-
     else:
         st.warning("Por favor, insira os dados das companhias.")
+
