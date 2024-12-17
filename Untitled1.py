@@ -121,4 +121,3 @@ if st.button("Organizar meu dia"):
         st.dataframe(schedule_df)
     else:
         st.warning("Por favor, insira os dados das companhias.")
-
