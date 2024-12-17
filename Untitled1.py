@@ -17,7 +17,7 @@ RATE_BY_PRODUCT = {
 
 # Preferências de produtos por companhia
 PRODUCT_PRIORITY = {
-    "TSO": "S10", "DM": "S10", "FIC": "S10", "CJ": "S10", "TOR": "S10",
+    "TSO": "S10", "DM": "S10", "FIC": "S10", "CJ": "S10", "TOR": "S10", "PTS": "S10",
     "CRS": "S500", "TCT": "S500", "TRR": "S500"
 }
 
