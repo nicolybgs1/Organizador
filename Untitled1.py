@@ -139,53 +139,47 @@ if st.button("Organizar meu dia"):
         st.subheader("Bombeios Organizados por Prioridade e Horário")
         schedule_df = pd.DataFrame(schedule)
 
-        # Atualiza os dados da tabela
-        data = pd.concat([data, schedule_df], ignore_index=True)
-        save_data(data)
+        # Lista de IDs das linhas para interagir
+        schedule_df["ID"] = schedule_df.index
 
-        # Cria colunas para os dados e os botões de edição/exclusão
-        for index, row in data.iterrows():
+        # Exibir dados e botões para edição e remoção
+        for index, row in schedule_df.iterrows():
             cols = st.columns([4, 1, 1])  # Ajuste a proporção conforme necessário
             with cols[0]:
                 st.write(row.to_frame().T)  # Exibe a linha do DataFrame
             with cols[1]:
                 if st.button(f"Remover", key=f"remove_{index}"):
-                    data = data.drop(index).reset_index(drop=True)
-                    save_data(data)  # Salva os dados no CSV
+                    schedule_df = schedule_df.drop(index).reset_index(drop=True)
+                    save_data(schedule_df)  # Salva os dados no CSV
                     st.success(f"Bombeio da companhia {row['Companhia']} removido com sucesso!")
             with cols[2]:
                 if st.button(f"Editar", key=f"edit_{index}"):
                     st.session_state.edit_index = index
 
         # Verifica se há uma linha em edição
-        if 'edit_index' in st.session_state and st.session_state.edit_index is not None:
+        if "edit_index" in st.session_state and st.session_state.edit_index is not None:
             edit_index = st.session_state.edit_index
             st.subheader("Editar Bombeio")
 
             # Preenche os campos com os dados atuais da linha selecionada
-            edit_company = st.text_input("Companhia", value=data.loc[edit_index, "Companhia"])
-            edit_product = st.text_input("Produto", value=data.loc[edit_index, "Produto"])
-            edit_volume = st.number_input("Volume (m³)", min_value=0, step=1, value=int(data.loc[edit_index, "Volume"]))
-            edit_start_time = st.text_input("Hora de Início (HH:MM)", value=data.loc[edit_index, "Início"])
+            edit_company = st.text_input("Companhia", value=schedule_df.loc[edit_index, "Companhia"])
+            edit_product = st.text_input("Produto", value=schedule_df.loc[edit_index, "Produto"])
+            edit_volume = st.number_input("Volume (m³)", min_value=0, step=1, value=int(schedule_df.loc[edit_index, "Volume"]))
+            edit_start_time = st.text_input("Hora de Início (HH:MM)", value=schedule_df.loc[edit_index, "Início"])
 
             # Botão para salvar a edição
             if st.button("Salvar Edição"):
-                try:
-                    # Atualiza os dados da linha
-                    data.loc[edit_index, "Companhia"] = edit_company
-                    data.loc[edit_index, "Produto"] = edit_product
-                    data.loc[edit_index, "Volume"] = edit_volume
-                    data.loc[edit_index, "Início"] = edit_start_time
+                schedule_df.loc[edit_index, "Companhia"] = edit_company
+                schedule_df.loc[edit_index, "Produto"] = edit_product
+                schedule_df.loc[edit_index, "Volume"] = edit_volume
+                schedule_df.loc[edit_index, "Início"] = edit_start_time
 
-                    # Salva os dados editados no CSV
-                    save_data(data)
+                save_data(schedule_df)
+                st.success("Bombeio editado com sucesso!")
+                st.session_state.edit_index = None
 
-                    # Exibe a mensagem de sucesso e limpa o índice de edição
-                    st.success("Bombeio editado com sucesso!")
-                    del st.session_state.edit_index  # Limpa o estado de edição
-                except ValueError:
-                    st.error("Erro ao editar os dados. Verifique os valores inseridos.")
+        # Exibir e salvar o agendamento atualizado
+        st.write("Tabela de Bombeios Atualizada:", schedule_df)
+        st.success("Dados atualizados com sucesso!")
 
-        # Exibe a tabela de bombeios atualizada
-        st.write("Tabela de Bombeios Atualizada:", data)
 
