@@ -1,7 +1,9 @@
+#!/usr/bin/env python
+# coding: utf-8
+
 import streamlit as st
 import pandas as pd
 import datetime
-import os
 
 # Dados de velocidades de envio por produto
 RATE_BY_PRODUCT = {
@@ -18,9 +20,6 @@ PRODUCT_PRIORITY = {
     "TSO": "S10", "DM": "S10", "FIC": "S10", "CJ": "S10", "TOR": "S10", "PTS": "S10",
     "CRS": "S500", "TCT": "S500", "TRR": "S500"
 }
-
-# Caminho do arquivo de dados históricos
-HISTORICAL_DATA_PATH = "dados_revisados.csv"
 
 # Função para calcular tempo de bombeio com base no produto e companhia
 def calculate_bombeio_time(product, volume, company):
@@ -50,7 +49,7 @@ def rank_companies(data):
         # Regra 1: Estoque (Máxima prioridade)
         if row["Estoque"] == "Não":
             score -= 1000
-
+        
         # Regra 2: Quantidade de tanques (Quanto menor, maior prioridade)
         score -= row["Tanques"] * 10
 
@@ -62,33 +61,32 @@ def rank_companies(data):
     data["Prioridade"] = data.apply(priority_score, axis=1)
     return data.sort_values(by=["Prioridade", "ProductPriority"], ascending=True)
 
-# Função para atualizar dados históricos
-def update_historical_data(new_data):
-    if os.path.exists(HISTORICAL_DATA_PATH):
-        historical_data = pd.read_csv(HISTORICAL_DATA_PATH)
-        historical_data = pd.concat([historical_data, new_data], ignore_index=True)
-    else:
-        historical_data = new_data
-    historical_data.to_csv(HISTORICAL_DATA_PATH, index=False)
+# Função para ajustar as regras com base nos dados históricos
+def update_rules(historical_data):
+    # Ajustar preferências de produtos com base nos dados históricos
+    preference_counts = historical_data.groupby(["Companhia", "Produto"]).size().reset_index(name="Count")
+    for company in preference_counts["Companhia"].unique():
+        preferred_product = preference_counts[preference_counts["Companhia"] == company].sort_values(by="Count", ascending=False).iloc[0]["Produto"]
+        PRODUCT_PRIORITY[company] = preferred_product
 
-# Função para carregar dados históricos
-def load_historical_data():
-    if os.path.exists(HISTORICAL_DATA_PATH):
-        return pd.read_csv(HISTORICAL_DATA_PATH)
-    return pd.DataFrame()
-
-# Função para ajustar taxas com base em dados históricos
-def adjust_rates_with_historical_data(historical_data):
-    if not historical_data.empty:
-        global RATE_BY_PRODUCT
-        avg_rates = historical_data.groupby("Produto").apply(
-            lambda x: (x["Volume"].sum() / ((x["Fim"] - x["Início"]).dt.total_seconds().sum() / 3600))
-        )
-        for product, rate in avg_rates.items():
-            RATE_BY_PRODUCT[product] = rate
+    # Ajustar taxas de bombeio com base nos tempos reais
+    for product in RATE_BY_PRODUCT.keys():
+        product_data = historical_data[historical_data["Produto"] == product]
+        if not product_data.empty:
+            total_volume = product_data["Volume"].sum()
+            total_time = product_data.apply(lambda row: (pd.to_datetime(row["Fim Real"]) - pd.to_datetime(row["Início Real"])).total_seconds() / 3600, axis=1).sum()
+            RATE_BY_PRODUCT[product] = round(total_volume / total_time, 2)
 
 # Inicialização da interface
 st.title("Organizador de Bombeios")
+
+# Carregar dados históricos
+try:
+    historical_data = pd.read_csv("dados_revisados.csv")
+    st.info("Dados históricos carregados para ajustar as regras.")
+    update_rules(historical_data)
+except FileNotFoundError:
+    st.warning("Nenhum dado histórico encontrado. As regras serão aplicadas sem ajustes prévios.")
 
 # Entrada de dados do usuário
 st.subheader("Insira os dados das companhias para o dia seguinte:")
@@ -104,12 +102,12 @@ for i in range(int(num_companies)):
     tanks = st.number_input(f"Quantidade de tanques {i+1}", min_value=1, step=1, key=f"tanks_{i}")
     additional_priority = st.text_input(f"Prioridade Adicional {i+1} (Operacional ou Cliente)", key=f"add_priority_{i}")
     additional_priority_level = st.slider(f"Nível da Prioridade Adicional {i+1} (0-10)", min_value=0, max_value=10, key=f"priority_level_{i}")
-
+    
     company_data.append({
-        "Companhia": company,
-        "Produto": product,
-        "Volume": volume,
-        "Estoque": stock,
+        "Companhia": company, 
+        "Produto": product, 
+        "Volume": volume, 
+        "Estoque": stock, 
         "Tanques": tanks,
         "Prioridade Adicional": additional_priority,
         "Prioridade Adicional (Nível)": additional_priority_level
@@ -126,16 +124,10 @@ if st.button("Organizar meu dia"):
 
         # Planejamento do horário dos bombeios
         start_time = datetime.datetime.combine(datetime.date.today(), datetime.time(0, 0))
-        end_of_day = datetime.datetime.combine(datetime.date.today(), datetime.time(23, 59))
         schedule = []
         for _, row in ranked_df.iterrows():
             duration = calculate_bombeio_time(row["Produto"], row["Volume"], row["Companhia"])
             end_time = start_time + datetime.timedelta(minutes=duration)
-
-            if end_time > end_of_day:
-                st.warning(f"Não foi possível programar o bombeio para a companhia {row['Companhia']} devido ao limite de tempo diário.")
-                break
-
             schedule.append({
                 "Companhia": row["Companhia"],
                 "Produto": row["Produto"],
@@ -151,19 +143,6 @@ if st.button("Organizar meu dia"):
         st.subheader("Bombeios Organizados por Prioridade e Horário")
         schedule_df = pd.DataFrame(schedule)
         st.dataframe(schedule_df)
-
-        # Entrada dos dados reais
-        st.subheader("Entrada dos dados reais ao final do dia")
-        for i, row in schedule_df.iterrows():
-            real_start = st.time_input(f"Horário real de início ({row['Companhia']})", key=f"real_start_{i}")
-            real_end = st.time_input(f"Horário real de término ({row['Companhia']})", key=f"real_end_{i}")
-
-        if st.button("Salvar Dados Reais"):
-            schedule_df["Início Real"] = schedule_df["Início"]
-            schedule_df["Fim Real"] = schedule_df["Fim"]
-            update_historical_data(schedule_df)
-            st.success("Dados reais salvos com sucesso!")
-
     else:
         st.warning("Por favor, insira os dados das companhias.")
 
