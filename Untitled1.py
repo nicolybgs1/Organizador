@@ -61,8 +61,32 @@ def rank_companies(data):
     data["Prioridade"] = data.apply(priority_score, axis=1)
     return data.sort_values(by=["Prioridade", "ProductPriority"], ascending=True)
 
+# Função para ajustar as regras com base nos dados históricos
+def update_rules(historical_data):
+    # Ajustar preferências de produtos com base nos dados históricos
+    preference_counts = historical_data.groupby(["Companhia", "Produto"]).size().reset_index(name="Count")
+    for company in preference_counts["Companhia"].unique():
+        preferred_product = preference_counts[preference_counts["Companhia"] == company].sort_values(by="Count", ascending=False).iloc[0]["Produto"]
+        PRODUCT_PRIORITY[company] = preferred_product
+
+    # Ajustar taxas de bombeio com base nos tempos reais
+    for product in RATE_BY_PRODUCT.keys():
+        product_data = historical_data[historical_data["Produto"] == product]
+        if not product_data.empty:
+            total_volume = product_data["Volume"].sum()
+            total_time = product_data.apply(lambda row: (pd.to_datetime(row["Fim Real"]) - pd.to_datetime(row["Início Real"])).total_seconds() / 3600, axis=1).sum()
+            RATE_BY_PRODUCT[product] = round(total_volume / total_time, 2)
+
 # Inicialização da interface
 st.title("Organizador de Bombeios")
+
+# Carregar dados históricos
+try:
+    historical_data = pd.read_csv("dados_revisados.csv")
+    st.info("Dados históricos carregados para ajustar as regras.")
+    update_rules(historical_data)
+except FileNotFoundError:
+    st.warning("Nenhum dado histórico encontrado. As regras serão aplicadas sem ajustes prévios.")
 
 # Entrada de dados do usuário
 st.subheader("Insira os dados das companhias para o dia seguinte:")
@@ -121,3 +145,19 @@ if st.button("Organizar meu dia"):
         st.dataframe(schedule_df)
     else:
         st.warning("Por favor, insira os dados das companhias.")
+
+# Revisão do planejamento
+st.subheader("Revisão do planejamento")
+if 'schedule_df' in locals():
+    for i in range(len(schedule_df)):
+        st.write(f"Companhia: {schedule_df.loc[i, 'Companhia']} | Produto: {schedule_df.loc[i, 'Produto']} | Volume: {schedule_df.loc[i, 'Volume']} | Horário: {schedule_df.loc[i, 'Início']} - {schedule_df.loc[i, 'Fim']}")
+        real_start = st.text_input(f"Início Real (HH:MM) para {schedule_df.loc[i, 'Companhia']}", key=f"real_start_{i}")
+        real_end = st.text_input(f"Fim Real (HH:MM) para {schedule_df.loc[i, 'Companhia']}", key=f"real_end_{i}")
+        schedule_df.loc[i, "Início Real"] = real_start
+        schedule_df.loc[i, "Fim Real"] = real_end
+
+    # Botão para salvar os dados revisados
+    if st.button("Salvar revisão"):
+        # Salvar os dados revisados em um arquivo ou banco de dados
+        schedule_df.to_csv("dados_revisados.csv", index=False)
+        st.success("Dados revisados salvos com sucesso!")
