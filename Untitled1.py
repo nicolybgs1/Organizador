@@ -181,5 +181,3 @@ if st.button("Organizar meu dia"):
         # Exibir e salvar o agendamento atualizado
         st.write("Tabela de Bombeios Atualizada:", schedule_df)
         st.success("Dados atualizados com sucesso!")
-
-
