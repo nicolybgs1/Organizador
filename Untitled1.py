@@ -142,23 +142,42 @@ if st.button("Organizar meu dia"):
         # Lista de IDs das linhas para interagir
         schedule_df["ID"] = schedule_df.index
 
-        for i, row in schedule_df.iterrows():
-            st.write(row.to_dict())
-            col1, col2 = st.columns([1, 1])
-            # Botão de editar
-            with col1:
-                new_volume = st.number_input(f"Editar Volume (Linha {i})", value=row["Volume"], key=f"edit_volume_{i}")
-                if st.button(f"Salvar Editado {i}", key=f"save_{i}"):
-                    schedule_df.at[i, "Volume"] = new_volume  # Atualiza o volume
+        # Exibir dados e botões para edição e remoção
+        for index, row in schedule_df.iterrows():
+            cols = st.columns([4, 1, 1])  # Ajuste a proporção conforme necessário
+            with cols[0]:
+                st.write(row.to_frame().T)  # Exibe a linha do DataFrame
+            with cols[1]:
+                if st.button(f"Remover", key=f"remove_{index}"):
+                    schedule_df = schedule_df.drop(index).reset_index(drop=True)
+                    save_data(schedule_df)  # Salva os dados no CSV
+                    st.success(f"Bombeio da companhia {row['Companhia']} removido com sucesso!")
+            with cols[2]:
+                if st.button(f"Editar", key=f"edit_{index}"):
+                    st.session_state.edit_index = index
 
-            # Botão de excluir
-            with col2:
-                if st.button(f"Excluir {i}", key=f"delete_{i}"):
-                    schedule_df = schedule_df.drop(i)  # Exclui a linha selecionada
+        # Verifica se há uma linha em edição
+        if "edit_index" in st.session_state and st.session_state.edit_index is not None:
+            edit_index = st.session_state.edit_index
+            st.subheader("Editar Bombeio")
+
+            # Preenche os campos com os dados atuais da linha selecionada
+            edit_company = st.text_input("Companhia", value=schedule_df.loc[edit_index, "Companhia"])
+            edit_product = st.text_input("Produto", value=schedule_df.loc[edit_index, "Produto"])
+            edit_volume = st.number_input("Volume (m³)", min_value=0, step=1, value=int(schedule_df.loc[edit_index, "Volume"]))
+            edit_start_time = st.text_input("Hora de Início (HH:MM)", value=schedule_df.loc[edit_index, "Início"])
+
+            # Botão para salvar a edição
+            if st.button("Salvar Edição"):
+                schedule_df.loc[edit_index, "Companhia"] = edit_company
+                schedule_df.loc[edit_index, "Produto"] = edit_product
+                schedule_df.loc[edit_index, "Volume"] = edit_volume
+                schedule_df.loc[edit_index, "Início"] = edit_start_time
+
+                save_data(schedule_df)
+                st.success("Bombeio editado com sucesso!")
+                st.session_state.edit_index = None
 
         # Exibir e salvar o agendamento atualizado
         st.write("Tabela de Bombeios Atualizada:", schedule_df)
-        data = pd.concat([data, schedule_df], ignore_index=True)
-        save_data(data)
         st.success("Dados atualizados com sucesso!")
-
