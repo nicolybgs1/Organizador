@@ -138,15 +138,27 @@ if st.button("Organizar meu dia"):
         # Exibição dos resultados
         st.subheader("Bombeios Organizados por Prioridade e Horário")
         schedule_df = pd.DataFrame(schedule)
+
+        # Lista de IDs das linhas para interagir
+        schedule_df["ID"] = schedule_df.index
+
         for i, row in schedule_df.iterrows():
             st.write(row.to_dict())
             col1, col2 = st.columns([1, 1])
-            if col1.button(f"Editar {i}", key=f"edit_{i}"):
-                row["Volume"] = st.number_input(f"Editar Volume (Linha {i})", value=row["Volume"])
-            if col2.button(f"Excluir {i}", key=f"delete_{i}"):
-                schedule_df.drop(index=i, inplace=True)
+            # Botão de editar
+            with col1:
+                new_volume = st.number_input(f"Editar Volume (Linha {i})", value=row["Volume"], key=f"edit_volume_{i}")
+                if st.button(f"Salvar Editado {i}", key=f"save_{i}"):
+                    schedule_df.at[i, "Volume"] = new_volume  # Atualiza o volume
 
-        # Salvar agendamento atualizado
+            # Botão de excluir
+            with col2:
+                if st.button(f"Excluir {i}", key=f"delete_{i}"):
+                    schedule_df = schedule_df.drop(i)  # Exclui a linha selecionada
+
+        # Exibir e salvar o agendamento atualizado
+        st.write("Tabela de Bombeios Atualizada:", schedule_df)
         data = pd.concat([data, schedule_df], ignore_index=True)
         save_data(data)
         st.success("Dados atualizados com sucesso!")
+
