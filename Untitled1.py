@@ -154,8 +154,12 @@ if st.button("Organizar meu dia"):
 
         # Botões de editar e remover ao lado de cada linha
         for i, row in schedule_df.iterrows():
-            edit_button = st.button(f"Editar {i}", key=f"edit_{i}")
-            remove_button = st.button(f"Remover {i}", key=f"remove_{i}")
+            col1, col2 = st.columns([4, 1])  # Definindo colunas para botões ao lado
+            with col1:
+                st.write(f"{row['Companhia']} - {row['Produto']} - {row['Início']} - {row['Fim']}")
+            with col2:
+                edit_button = st.button(f"Editar {i}", key=f"edit_{i}")
+                remove_button = st.button(f"Remover {i}", key=f"remove_{i}")
 
             if edit_button:
                 # Ação de editar (exemplo: mostrar campos de edição)
@@ -186,4 +190,3 @@ if st.button("Organizar meu dia"):
 
     else:
         st.warning("Por favor, insira os dados das companhias.")
-
