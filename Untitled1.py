@@ -145,7 +145,7 @@ if st.button("Organizar meu dia"):
         save_data(data)
         st.success("Dados salvos com sucesso!")
 
-# Exibir dados salvos e permitir edição
+# Exibir dados salvos e permitir edição e exclusão
 st.subheader("Dados Salvos")
 if not data.empty:
     for i, row in data.iterrows():
@@ -155,7 +155,9 @@ if not data.empty:
             data.at[i, "Volume"] = new_volume
             save_data(data)
             st.success(f"Linha {i+1} atualizada com sucesso!")
-    st.dataframe(data)
+        if st.button(f"Excluir Linha {i+1}"):
+            data = data.drop(i).reset_index(drop=True)
+            save_data(data)
+            st.success(f"Linha {i+1} excluída com sucesso!")
 else:
     st.info("Nenhum dado salvo ainda.")
-
