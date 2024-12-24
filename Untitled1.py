@@ -138,26 +138,15 @@ if st.button("Organizar meu dia"):
         # Exibição dos resultados
         st.subheader("Bombeios Organizados por Prioridade e Horário")
         schedule_df = pd.DataFrame(schedule)
-        st.dataframe(schedule_df)
+        for i, row in schedule_df.iterrows():
+            st.write(row.to_dict())
+            col1, col2 = st.columns([1, 1])
+            if col1.button(f"Editar {i}", key=f"edit_{i}"):
+                row["Volume"] = st.number_input(f"Editar Volume (Linha {i})", value=row["Volume"])
+            if col2.button(f"Excluir {i}", key=f"delete_{i}"):
+                schedule_df.drop(index=i, inplace=True)
 
-        # Salvar agendamento
+        # Salvar agendamento atualizado
         data = pd.concat([data, schedule_df], ignore_index=True)
         save_data(data)
-        st.success("Dados salvos com sucesso!")
-
-# Exibir dados salvos e permitir edição e exclusão
-st.subheader("Dados Salvos")
-if not data.empty:
-    for i, row in data.iterrows():
-        st.markdown(f"**Linha {i+1} - Companhia: {row['Companhia']}**")
-        if st.button(f"Editar Linha {i+1}"):
-            new_volume = st.number_input(f"Editar Volume (Linha {i+1})", value=row["Volume"], min_value=0)
-            data.at[i, "Volume"] = new_volume
-            save_data(data)
-            st.success(f"Linha {i+1} atualizada com sucesso!")
-        if st.button(f"Excluir Linha {i+1}"):
-            data = data.drop(i).reset_index(drop=True)
-            save_data(data)
-            st.success(f"Linha {i+1} excluída com sucesso!")
-else:
-    st.info("Nenhum dado salvo ainda.")
+        st.success("Dados atualizados com sucesso!")
