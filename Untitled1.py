@@ -62,21 +62,33 @@ def rank_companies(data):
     data["Prioridade"] = data.apply(priority_score, axis=1)
     return data.sort_values(by=["Prioridade", "ProductPriority"], ascending=True)
 
-# Função para carregar ou inicializar dados persistentes
-def load_or_initialize_data():
+# Função para atualizar dados históricos
+def update_historical_data(new_data):
+    if os.path.exists(HISTORICAL_DATA_PATH):
+        historical_data = pd.read_csv(HISTORICAL_DATA_PATH)
+        historical_data = pd.concat([historical_data, new_data], ignore_index=True)
+    else:
+        historical_data = new_data
+    historical_data.to_csv(HISTORICAL_DATA_PATH, index=False)
+
+# Função para carregar dados históricos
+def load_historical_data():
     if os.path.exists(HISTORICAL_DATA_PATH):
         return pd.read_csv(HISTORICAL_DATA_PATH)
-    return pd.DataFrame(columns=["Companhia", "Produto", "Volume", "Início", "Fim", "Prioridade Adicional", "Início Real", "Fim Real"])
+    return pd.DataFrame()
 
-# Função para salvar dados no arquivo persistente
-def save_data(data):
-    data.to_csv(HISTORICAL_DATA_PATH, index=False)
+# Função para ajustar taxas com base em dados históricos
+def adjust_rates_with_historical_data(historical_data):
+    if not historical_data.empty:
+        global RATE_BY_PRODUCT
+        avg_rates = historical_data.groupby("Produto").apply(
+            lambda x: (x["Volume"].sum() / ((x["Fim"] - x["Início"]).dt.total_seconds().sum() / 3600))
+        )
+        for product, rate in avg_rates.items():
+            RATE_BY_PRODUCT[product] = rate
 
 # Inicialização da interface
 st.title("Organizador de Bombeios")
-
-# Carregar dados persistentes
-data = load_or_initialize_data()
 
 # Entrada de dados do usuário
 st.subheader("Insira os dados das companhias para o dia seguinte:")
@@ -138,46 +150,19 @@ if st.button("Organizar meu dia"):
         # Exibição dos resultados
         st.subheader("Bombeios Organizados por Prioridade e Horário")
         schedule_df = pd.DataFrame(schedule)
+        st.dataframe(schedule_df)
 
-        # Lista de IDs das linhas para interagir
-        schedule_df["ID"] = schedule_df.index
+        # Entrada dos dados reais
+        st.subheader("Entrada dos dados reais ao final do dia")
+        for i, row in schedule_df.iterrows():
+            real_start = st.time_input(f"Horário real de início ({row['Companhia']})", key=f"real_start_{i}")
+            real_end = st.time_input(f"Horário real de término ({row['Companhia']})", key=f"real_end_{i}")
 
-        # Exibir dados e botões para edição e remoção
-        for index, row in schedule_df.iterrows():
-            cols = st.columns([4, 1, 1])  # Ajuste a proporção conforme necessário
-            with cols[0]:
-                st.write(row.to_frame().T)  # Exibe a linha do DataFrame
-            with cols[1]:
-                if st.button(f"Remover", key=f"remove_{index}"):
-                    schedule_df = schedule_df.drop(index).reset_index(drop=True)
-                    save_data(schedule_df)  # Salva os dados no CSV
-                    st.success(f"Bombeio da companhia {row['Companhia']} removido com sucesso!")
-            with cols[2]:
-                if st.button(f"Editar", key=f"edit_{index}"):
-                    st.session_state.edit_index = index
+        if st.button("Salvar Dados Reais"):
+            schedule_df["Início Real"] = schedule_df["Início"]
+            schedule_df["Fim Real"] = schedule_df["Fim"]
+            update_historical_data(schedule_df)
+            st.success("Dados reais salvos com sucesso!")
 
-        # Verifica se há uma linha em edição
-        if "edit_index" in st.session_state and st.session_state.edit_index is not None:
-            edit_index = st.session_state.edit_index
-            st.subheader("Editar Bombeio")
-
-            # Preenche os campos com os dados atuais da linha selecionada
-            edit_company = st.text_input("Companhia", value=schedule_df.loc[edit_index, "Companhia"])
-            edit_product = st.text_input("Produto", value=schedule_df.loc[edit_index, "Produto"])
-            edit_volume = st.number_input("Volume (m³)", min_value=0, step=1, value=int(schedule_df.loc[edit_index, "Volume"]))
-            edit_start_time = st.text_input("Hora de Início (HH:MM)", value=schedule_df.loc[edit_index, "Início"])
-
-            # Botão para salvar a edição
-            if st.button("Salvar Edição"):
-                schedule_df.loc[edit_index, "Companhia"] = edit_company
-                schedule_df.loc[edit_index, "Produto"] = edit_product
-                schedule_df.loc[edit_index, "Volume"] = edit_volume
-                schedule_df.loc[edit_index, "Início"] = edit_start_time
-
-                save_data(schedule_df)
-                st.success("Bombeio editado com sucesso!")
-                st.session_state.edit_index = None
-
-        # Exibir e salvar o agendamento atualizado
-        st.write("Tabela de Bombeios Atualizada:", schedule_df)
-        st.success("Dados atualizados com sucesso!")
+    else:
+        st.warning("Por favor, insira os dados das companhias.")
