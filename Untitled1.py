@@ -152,6 +152,26 @@ if st.button("Organizar meu dia"):
         schedule_df = pd.DataFrame(schedule)
         st.dataframe(schedule_df)
 
+        # Botões de editar e remover ao lado de cada linha
+        for i, row in schedule_df.iterrows():
+            edit_button = st.button(f"Editar {i}", key=f"edit_{i}")
+            remove_button = st.button(f"Remover {i}", key=f"remove_{i}")
+
+            if edit_button:
+                # Ação de editar (exemplo: mostrar campos de edição)
+                new_start = st.time_input(f"Novo horário de início ({row['Companhia']})", value=datetime.datetime.strptime(row['Início'], "%H:%M").time(), key=f"new_start_{i}")
+                new_end = st.time_input(f"Novo horário de término ({row['Companhia']})", value=datetime.datetime.strptime(row['Fim'], "%H:%M").time(), key=f"new_end_{i}")
+                schedule_df.at[i, "Início"] = new_start.strftime("%H:%M")
+                schedule_df.at[i, "Fim"] = new_end.strftime("%H:%M")
+                st.success(f"Horário atualizado para {row['Companhia']}.")
+
+            if remove_button:
+                schedule_df = schedule_df.drop(i)
+                st.success(f"Linhas removidas.")
+
+        # Atualiza a tabela de bombeios organizados
+        st.dataframe(schedule_df)
+
         # Entrada dos dados reais
         st.subheader("Entrada dos dados reais ao final do dia")
         for i, row in schedule_df.iterrows():
@@ -166,3 +186,4 @@ if st.button("Organizar meu dia"):
 
     else:
         st.warning("Por favor, insira os dados das companhias.")
+
