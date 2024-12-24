@@ -147,52 +147,18 @@ if st.button("Organizar meu dia"):
             # Adiciona intervalo de 10 minutos entre bombeios
             start_time = end_time + datetime.timedelta(minutes=10)
 
-        # Exibição dos resultados de forma compacta
+        # Exibição dos resultados
         st.subheader("Bombeios Organizados por Prioridade e Horário")
-        for i, row in enumerate(schedule):
-            st.markdown(f"### Bombeio {i+1}")
-            st.write(f"**Companhia**: {row['Companhia']}")
-            st.write(f"**Produto**: {row['Produto']}")
-            st.write(f"**Volume**: {row['Volume']} m³")
-            st.write(f"**Início**: {row['Início']}")
-            st.write(f"**Fim**: {row['Fim']}")
-            st.write(f"**Prioridade Adicional**: {row['Prioridade Adicional']}")
-            st.write("---")
-
-        # Botões de editar e remover ao lado de cada linha
-        for i, row in enumerate(schedule):
-            col1, col2 = st.columns([4, 1])  # Definindo colunas para botões ao lado
-            with col1:
-                st.write(f"{row['Companhia']} - {row['Produto']} - {row['Início']} - {row['Fim']}")
-            with col2:
-                edit_button = st.button(f"Editar {i}", key=f"edit_{i}")
-                remove_button = st.button(f"Remover {i}", key=f"remove_{i}")
-
-            if edit_button:
-                # Ação de editar (exemplo: mostrar campos de edição)
-                new_start = st.time_input(f"Novo horário de início ({row['Companhia']})", value=datetime.datetime.strptime(row['Início'], "%H:%M").time(), key=f"new_start_{i}")
-                new_end = st.time_input(f"Novo horário de término ({row['Companhia']})", value=datetime.datetime.strptime(row['Fim'], "%H:%M").time(), key=f"new_end_{i}")
-                schedule[i]["Início"] = new_start.strftime("%H:%M")
-                schedule[i]["Fim"] = new_end.strftime("%H:%M")
-                st.success(f"Horário atualizado para {row['Companhia']}.")
-
-            if remove_button:
-                schedule.pop(i)
-                st.success(f"Bombeio removido.")
-
-        # Atualiza a tabela de bombeios organizados
-        st.write("### Bombeios Atualizados:")
-        for row in schedule:
-            st.markdown(f"**Companhia**: {row['Companhia']}, **Produto**: {row['Produto']}, **Início**: {row['Início']}, **Fim**: {row['Fim']}")
+        schedule_df = pd.DataFrame(schedule)
+        st.dataframe(schedule_df)
 
         # Entrada dos dados reais
         st.subheader("Entrada dos dados reais ao final do dia")
-        for i, row in enumerate(schedule):
+        for i, row in schedule_df.iterrows():
             real_start = st.time_input(f"Horário real de início ({row['Companhia']})", key=f"real_start_{i}")
             real_end = st.time_input(f"Horário real de término ({row['Companhia']})", key=f"real_end_{i}")
 
         if st.button("Salvar Dados Reais"):
-            schedule_df = pd.DataFrame(schedule)
             schedule_df["Início Real"] = schedule_df["Início"]
             schedule_df["Fim Real"] = schedule_df["Fim"]
             update_historical_data(schedule_df)
