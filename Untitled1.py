@@ -1,8 +1,3 @@
-O problema está na forma como os dados do usuário são salvos e carregados. Atualmente, os dados são salvos no arquivo JSON apenas quando o botão "Salvar Dados Reais" é pressionado. Para garantir que os dados sejam salvos e carregados corretamente ao recarregar a página, você pode ajustar o código para salvar os dados do usuário sempre que houver uma entrada de dados.
-
-Aqui está uma versão ajustada do seu código que salva os dados do usuário sempre que há uma entrada:
-
-```python
 import streamlit as st
 import pandas as pd
 import datetime
