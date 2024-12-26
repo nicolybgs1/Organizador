@@ -19,9 +19,6 @@ PRODUCT_PRIORITY = {
     "CRS": "S500", "TCT": "S500", "TRR": "S500"
 }
 
-# Caminho do arquivo de dados históricos
-HISTORICAL_DATA_PATH = "dados_revisados.csv"
-
 # Função para calcular tempo de bombeio com base no produto e companhia
 def calculate_bombeio_time(product, volume, company):
     rate = RATE_BY_PRODUCT.get(product, 500)
@@ -47,45 +44,14 @@ def adjust_product_priority(data):
 def rank_companies(data):
     def priority_score(row):
         score = 0
-        # Regra 1: Estoque (Máxima prioridade)
         if row["Estoque"] == "Não":
             score -= 1000
-
-        # Regra 2: Quantidade de tanques (Quanto menor, maior prioridade)
         score -= row["Tanques"] * 10
-
-        # Regra 3: Prioridade Adicional (quanto maior o nível, maior prioridade negativa)
         score -= row["Prioridade Adicional (Nível)"] * 50
-
         return score
 
     data["Prioridade"] = data.apply(priority_score, axis=1)
     return data.sort_values(by=["Prioridade", "ProductPriority"], ascending=True)
-
-# Função para atualizar dados históricos
-def update_historical_data(new_data):
-    if os.path.exists(HISTORICAL_DATA_PATH):
-        historical_data = pd.read_csv(HISTORICAL_DATA_PATH)
-        historical_data = pd.concat([historical_data, new_data], ignore_index=True)
-    else:
-        historical_data = new_data
-    historical_data.to_csv(HISTORICAL_DATA_PATH, index=False)
-
-# Função para carregar dados históricos
-def load_historical_data():
-    if os.path.exists(HISTORICAL_DATA_PATH):
-        return pd.read_csv(HISTORICAL_DATA_PATH)
-    return pd.DataFrame()
-
-# Função para ajustar taxas com base em dados históricos
-def adjust_rates_with_historical_data(historical_data):
-    if not historical_data.empty:
-        global RATE_BY_PRODUCT
-        avg_rates = historical_data.groupby("Produto").apply(
-            lambda x: (x["Volume"].sum() / ((x["Fim"] - x["Início"]).dt.total_seconds().sum() / 3600))
-        )
-        for product, rate in avg_rates.items():
-            RATE_BY_PRODUCT[product] = rate
 
 # Inicialização da interface
 st.title("Organizador de Bombeios")
@@ -119,12 +85,9 @@ for i in range(int(num_companies)):
 if st.button("Organizar meu dia"):
     if len(company_data) > 0:
         df = pd.DataFrame(company_data)
-        # Ajustar a prioridade de produtos
         df = adjust_product_priority(df)
-        # Ranqueamento final
         ranked_df = rank_companies(df)
 
-        # Planejamento do horário dos bombeios
         start_time = datetime.datetime.combine(datetime.date.today(), datetime.time(0, 0))
         end_of_day = datetime.datetime.combine(datetime.date.today(), datetime.time(23, 59))
         schedule = []
@@ -144,25 +107,29 @@ if st.button("Organizar meu dia"):
                 "Fim": end_time.strftime("%H:%M"),
                 "Prioridade Adicional": row["Prioridade Adicional"]
             })
-            # Adiciona intervalo de 10 minutos entre bombeios
             start_time = end_time + datetime.timedelta(minutes=10)
 
         # Exibição dos resultados
         st.subheader("Bombeios Organizados por Prioridade e Horário")
         schedule_df = pd.DataFrame(schedule)
-        st.dataframe(schedule_df)
 
-        # Entrada dos dados reais
-        st.subheader("Entrada dos dados reais ao final do dia")
-        for i, row in schedule_df.iterrows():
-            real_start = st.time_input(f"Horário real de início ({row['Companhia']})", key=f"real_start_{i}")
-            real_end = st.time_input(f"Horário real de término ({row['Companhia']})", key=f"real_end_{i}")
+        # Exibição dinâmica com botões de editar e remover
+        edited_schedule = schedule_df.copy()
+        for index, row in schedule_df.iterrows():
+            col1, col2, col3 = st.columns([3, 1, 1])
+            with col1:
+                st.text(f"{row['Companhia']} | {row['Produto']} | {row['Volume']} m³")
+            with col2:
+                if st.button(f"Editar {index}", key=f"edit_{index}"):
+                    # Permitir editar os valores
+                    new_volume = st.number_input(f"Volume para {row['Companhia']}", value=row["Volume"], step=1, key=f"volume_edit_{index}")
+                    edited_schedule.at[index, "Volume"] = new_volume
+            with col3:
+                if st.button(f"Remover {index}", key=f"remove_{index}"):
+                    edited_schedule = edited_schedule.drop(index)
 
-        if st.button("Salvar Dados Reais"):
-            schedule_df["Início Real"] = schedule_df["Início"]
-            schedule_df["Fim Real"] = schedule_df["Fim"]
-            update_historical_data(schedule_df)
-            st.success("Dados reais salvos com sucesso!")
-
+        st.subheader("Tabela Atualizada")
+        st.dataframe(edited_schedule.reset_index(drop=True))
     else:
         st.warning("Por favor, insira os dados das companhias.")
+
