@@ -132,6 +132,16 @@ for i in range(int(num_companies)):
         "Prioridade Adicional (Nível)": additional_priority_level
     })
 
+    # Salvar dados do usuário a cada entrada
+    user_data[f"company_{i}"] = company
+    user_data[f"product_{i}"] = product
+    user_data[f"volume_{i}"] = volume
+    user_data[f"stock_{i}"] = stock
+    user_data[f"tanks_{i}"] = tanks
+    user_data[f"add_priority_{i}"] = additional_priority
+    user_data[f"priority_level_{i}"] = additional_priority_level
+    save_user_data(user_data)
+
 # Processamento dos dados
 if st.button("Organizar meu dia"):
     if len(company_data) > 0:
@@ -184,4 +194,3 @@ if st.button("Organizar meu dia"):
 
     else:
         st.warning("Por favor, insira os dados das companhias.")
-
