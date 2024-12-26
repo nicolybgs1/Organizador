@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 import datetime
 import os
-from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
 
 # Dados de velocidades de envio por produto
 RATE_BY_PRODUCT = {
@@ -72,6 +71,22 @@ def update_historical_data(new_data):
         historical_data = new_data
     historical_data.to_csv(HISTORICAL_DATA_PATH, index=False)
 
+# Função para carregar dados históricos
+def load_historical_data():
+    if os.path.exists(HISTORICAL_DATA_PATH):
+        return pd.read_csv(HISTORICAL_DATA_PATH)
+    return pd.DataFrame()
+
+# Função para ajustar taxas com base em dados históricos
+def adjust_rates_with_historical_data(historical_data):
+    if not historical_data.empty:
+        global RATE_BY_PRODUCT
+        avg_rates = historical_data.groupby("Produto").apply(
+            lambda x: (x["Volume"].sum() / ((x["Fim"] - x["Início"]).dt.total_seconds().sum() / 3600))
+        )
+        for product, rate in avg_rates.items():
+            RATE_BY_PRODUCT[product] = rate
+
 # Inicialização da interface
 st.title("Organizador de Bombeios")
 
@@ -135,26 +150,19 @@ if st.button("Organizar meu dia"):
         # Exibição dos resultados
         st.subheader("Bombeios Organizados por Prioridade e Horário")
         schedule_df = pd.DataFrame(schedule)
+        st.dataframe(schedule_df)
 
-        # Usando AgGrid para edição e remoção
-        gb = GridOptionsBuilder.from_dataframe(schedule_df)
-        gb.configure_pagination()
-        gb.configure_default_column(editable=True)
-        gb.configure_selection("single", use_checkbox=True)
-        grid_options = gb.build()
+        # Entrada dos dados reais
+        st.subheader("Entrada dos dados reais ao final do dia")
+        for i, row in schedule_df.iterrows():
+            real_start = st.time_input(f"Horário real de início ({row['Companhia']})", key=f"real_start_{i}")
+            real_end = st.time_input(f"Horário real de término ({row['Companhia']})", key=f"real_end_{i}")
 
-        response = AgGrid(
-            schedule_df,
-            gridOptions=grid_options,
-            update_mode=GridUpdateMode.MODEL_CHANGED,
-            data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
-        )
-
-        edited_df = response["data"]
-
-        if st.button("Salvar Alterações"):
-            update_historical_data(edited_df)
-            st.success("Alterações salvas com sucesso!")
+        if st.button("Salvar Dados Reais"):
+            schedule_df["Início Real"] = schedule_df["Início"]
+            schedule_df["Fim Real"] = schedule_df["Fim"]
+            update_historical_data(schedule_df)
+            st.success("Dados reais salvos com sucesso!")
 
     else:
         st.warning("Por favor, insira os dados das companhias.")
