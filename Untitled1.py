@@ -1,6 +1,8 @@
+pip install openpyxl
+
 import streamlit as st
 import pandas as pd
-
+import openpyxl
 
 # Função para carregar e exibir o arquivo Excel
 def load_excel_file(file):
