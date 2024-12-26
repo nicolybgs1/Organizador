@@ -100,7 +100,6 @@ for i in range(int(num_companies)):
     product = st.selectbox(f"Produto {i+1}", ["GASOLINA", "DIESEL S10", "DIESEL S500", "QAV-1 JET", "OCB1"], key=f"product_{i}")
     volume = st.number_input(f"Volume (m³) a ser enviado {i+1}", min_value=0, step=1, key=f"volume_{i}")
     stock = st.selectbox(f"Companhia tem estoque? {i+1}", ["Sim", "Não"], key=f"stock_{i}")
-    tanks = st.number_input(f"Quantidade de tanques {i+1}", min_value=1, step=1, key=f"tanks_{i}")
     additional_priority = st.text_input(f"Prioridade Adicional {i+1} (Operacional ou Cliente)", key=f"add_priority_{i}")
     additional_priority_level = st.slider(f"Nível da Prioridade Adicional {i+1} (0-10)", min_value=0, max_value=10, key=f"priority_level_{i}")
 
@@ -109,7 +108,6 @@ for i in range(int(num_companies)):
         "Produto": product,
         "Volume": volume,
         "Estoque": stock,
-        "Tanques": tanks,
         "Prioridade Adicional": additional_priority,
         "Prioridade Adicional (Nível)": additional_priority_level
     })
