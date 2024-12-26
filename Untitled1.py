@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import openpyxl
 
 # Função para carregar o arquivo Excel e exibir os dados
 def load_and_display_excel():
