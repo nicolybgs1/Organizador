@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-import openpyxl  # Agora você pode usar o openpyxl para ler arquivos Excel
+import openpyxl
 
 # Função para carregar e exibir o arquivo Excel
 def load_excel_file(file):
