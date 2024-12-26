@@ -27,7 +27,7 @@ USER_DATA_PATH = "user_data.json"  # Caminho para o arquivo JSON onde os dados d
 # Função para calcular tempo de bombeio com base no produto e companhia
 def calculate_bombeio_time(product, volume, company):
     rate = RATE_BY_PRODUCT.get(product, 500)
-    if product == "S10" and company in ["POO", "PET"]:
+    if product == "S10" and company in ["POO", "VIBRA"]:
         rate = 1200
     duration = volume / rate  # duração em horas
     return round(duration * 60)  # duração em minutos
@@ -125,7 +125,7 @@ num_companies = st.number_input("Quantas companhias irão receber produto?", min
 company_data = []
 for i in range(int(num_companies)):
     st.markdown(f"### Companhia {i+1}")
-    company = st.selectbox(f"Nome da Companhia {i+1}", ["POO", "PET", "SIM", "PTS", "FIC", "CJ", "TCT", "TRR", "TSO", "RM", "OPL", "CRS", "TOR", "DM", "SHE"], key=f"company_{i}", index=user_data.get(f"company_{i}", 0))
+    company = st.selectbox(f"Nome da Companhia {i+1}", ["POO", "VIBRA", "SIM", "PTS", "FIC", "CJ", "TCT", "TRR", "TSO", "RM", "OPL", "CRS", "TOR", "DM", "SHE"], key=f"company_{i}", index=user_data.get(f"company_{i}", 0))
     product = st.selectbox(f"Produto {i+1}", ["GAS", "S10", "S500", "QAV", "QAV-A1", "OC"], key=f"product_{i}", index=user_data.get(f"product_{i}", 0))
     volume = st.number_input(f"Volume (m³) a ser enviado {i+1}", min_value=0, step=1, key=f"volume_{i}", value=user_data.get(f"volume_{i}", 0))
     stock = st.selectbox(f"Companhia tem estoque? {i+1}", ["Sim", "Não"], key=f"stock_{i}", index=user_data.get(f"stock_{i}", 0))
