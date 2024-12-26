@@ -154,15 +154,31 @@ if st.button("Organizar meu dia"):
 
         # Entrada dos dados reais
         st.subheader("Entrada dos dados reais ao final do dia")
+        real_data = []  # Lista para armazenar os dados reais
+        
         for i, row in schedule_df.iterrows():
             real_start = st.time_input(f"Horário real de início ({row['Companhia']})", key=f"real_start_{i}")
             real_end = st.time_input(f"Horário real de término ({row['Companhia']})", key=f"real_end_{i}")
-
+        
+            # Coletar os dados reais inputados pelo usuário
+            real_data.append({
+                "Companhia": row["Companhia"],
+                "Produto": row["Produto"],
+                "Volume": row["Volume"],
+                "Início Real": real_start.strftime("%H:%M"),
+                "Fim Real": real_end.strftime("%H:%M"),
+                "Prioridade Adicional": row["Prioridade Adicional"]
+            })
+        
+        # Botão para salvar os dados reais no banco de dados
         if st.button("Salvar Dados Reais"):
-            schedule_df["Início Real"] = schedule_df["Início"]
-            schedule_df["Fim Real"] = schedule_df["Fim"]
-            update_historical_data(schedule_df)
-            st.success("Dados reais salvos com sucesso!")
-
-    else:
-        st.warning("Por favor, insira os dados das companhias.")
+            if real_data:
+                # Converter os dados reais em DataFrame
+                real_data_df = pd.DataFrame(real_data)
+        
+                # Salvar apenas os dados reais no banco de dados (ou CSV)
+                update_historical_data(real_data_df)
+        
+                st.success("Dados reais salvos com sucesso!")
+            else:
+                st.warning("Por favor, insira os horários reais antes de salvar.")
