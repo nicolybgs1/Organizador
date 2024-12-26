@@ -180,7 +180,8 @@ if st.button("Organizar meu dia"):
             schedule_df["Fim Real"] = schedule_df["Fim"]
             update_historical_data(schedule_df)
             st.success("Dados reais salvos com sucesso!")
-            save_user_data(user_data)  # Salvar os dados do usuário
+            save_user_data(company_data)  # Salvar os dados do usuário
 
     else:
         st.warning("Por favor, insira os dados das companhias.")
+
