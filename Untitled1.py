@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 import os
+import json
 
 # Dados de velocidades de envio por produto
 RATE_BY_PRODUCT = {
@@ -21,6 +22,7 @@ PRODUCT_PRIORITY = {
 
 # Caminho do arquivo de dados históricos
 HISTORICAL_DATA_PATH = "dados_revisados.csv"
+USER_DATA_PATH = "user_data.json"  # Caminho para o arquivo JSON onde os dados do usuário serão salvos
 
 # Função para calcular tempo de bombeio com base no produto e companhia
 def calculate_bombeio_time(product, volume, company):
@@ -62,14 +64,37 @@ def rank_companies(data):
     data["Prioridade"] = data.apply(priority_score, axis=1)
     return data.sort_values(by=["Prioridade", "ProductPriority"], ascending=True)
 
+# Função para salvar dados no arquivo JSON
+def save_user_data(data):
+    try:
+        with open(USER_DATA_PATH, 'w') as f:
+            json.dump(data, f)
+        st.success("Dados salvos com sucesso!")
+    except Exception as e:
+        st.error(f"Erro ao salvar os dados: {e}")
+
+# Função para carregar dados do arquivo JSON
+def load_user_data():
+    if os.path.exists(USER_DATA_PATH):
+        try:
+            with open(USER_DATA_PATH, 'r') as f:
+                return json.load(f)
+        except Exception as e:
+            st.error(f"Erro ao carregar os dados: {e}")
+    return {}
+
 # Função para atualizar dados históricos
 def update_historical_data(new_data):
-    if os.path.exists(HISTORICAL_DATA_PATH):
-        historical_data = pd.read_csv(HISTORICAL_DATA_PATH)
-        historical_data = pd.concat([historical_data, new_data], ignore_index=True)
-    else:
-        historical_data = new_data
-    historical_data.to_csv(HISTORICAL_DATA_PATH, index=False)
+    try:
+        if os.path.exists(HISTORICAL_DATA_PATH):
+            historical_data = pd.read_csv(HISTORICAL_DATA_PATH)
+            historical_data = pd.concat([historical_data, new_data], ignore_index=True)
+        else:
+            historical_data = new_data
+        historical_data.to_csv(HISTORICAL_DATA_PATH, index=False)
+        st.success("Dados históricos atualizados com sucesso!")
+    except Exception as e:
+        st.error(f"Erro ao atualizar dados históricos: {e}")
 
 # Função para carregar dados históricos
 def load_historical_data():
@@ -90,6 +115,9 @@ def adjust_rates_with_historical_data(historical_data):
 # Inicialização da interface
 st.title("Organizador de Bombeios")
 
+# Carregar dados do usuário se existirem
+user_data = load_user_data()
+
 # Entrada de dados do usuário
 st.subheader("Insira os dados das companhias para o dia seguinte:")
 num_companies = st.number_input("Quantas companhias irão receber produto?", min_value=1, step=1)
@@ -97,13 +125,13 @@ num_companies = st.number_input("Quantas companhias irão receber produto?", min
 company_data = []
 for i in range(int(num_companies)):
     st.markdown(f"### Companhia {i+1}")
-    company = st.selectbox(f"Nome da Companhia {i+1}", ["POO", "PET", "SIM", "PTS", "FIC", "CJ", "TCT", "TRR", "TSO", "RM", "OPL", "CRS", "TOR", "DM", "SHE"], key=f"company_{i}")
-    product = st.selectbox(f"Produto {i+1}", ["GAS", "S10", "S500", "QAV", "QAV-A1", "OC"], key=f"product_{i}")
-    volume = st.number_input(f"Volume (m³) a ser enviado {i+1}", min_value=0, step=1, key=f"volume_{i}")
-    stock = st.selectbox(f"Companhia tem estoque? {i+1}", ["Sim", "Não"], key=f"stock_{i}")
-    tanks = st.number_input(f"Quantidade de tanques {i+1}", min_value=1, step=1, key=f"tanks_{i}")
-    additional_priority = st.text_input(f"Prioridade Adicional {i+1} (Operacional ou Cliente)", key=f"add_priority_{i}")
-    additional_priority_level = st.slider(f"Nível da Prioridade Adicional {i+1} (0-10)", min_value=0, max_value=10, key=f"priority_level_{i}")
+    company = st.selectbox(f"Nome da Companhia {i+1}", ["POO", "PET", "SIM", "PTS", "FIC", "CJ", "TCT", "TRR", "TSO", "RM", "OPL", "CRS", "TOR", "DM", "SHE"], key=f"company_{i}", index=user_data.get(f"company_{i}", 0))
+    product = st.selectbox(f"Produto {i+1}", ["GAS", "S10", "S500", "QAV", "QAV-A1", "OC"], key=f"product_{i}", index=user_data.get(f"product_{i}", 0))
+    volume = st.number_input(f"Volume (m³) a ser enviado {i+1}", min_value=0, step=1, key=f"volume_{i}", value=user_data.get(f"volume_{i}", 0))
+    stock = st.selectbox(f"Companhia tem estoque? {i+1}", ["Sim", "Não"], key=f"stock_{i}", index=user_data.get(f"stock_{i}", 0))
+    tanks = st.number_input(f"Quantidade de tanques {i+1}", min_value=1, step=1, key=f"tanks_{i}", value=user_data.get(f"tanks_{i}", 1))
+    additional_priority = st.text_input(f"Prioridade Adicional {i+1} (Operacional ou Cliente)", key=f"add_priority_{i}", value=user_data.get(f"add_priority_{i}", ""))
+    additional_priority_level = st.slider(f"Nível da Prioridade Adicional {i+1} (0-10)", min_value=0, max_value=10, key=f"priority_level_{i}", value=user_data.get(f"priority_level_{i}", 0))
 
     company_data.append({
         "Companhia": company,
@@ -162,7 +190,7 @@ if st.button("Organizar meu dia"):
             schedule_df["Início Real"] = schedule_df["Início"]
             schedule_df["Fim Real"] = schedule_df["Fim"]
             update_historical_data(schedule_df)
-            st.success("Dados reais salvos com sucesso!")
+            save_user_data(company_data)  # Salvar os dados do usuário
 
     else:
         st.warning("Por favor, insira os dados das companhias.")
