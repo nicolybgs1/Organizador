@@ -5,18 +5,17 @@ import os
 
 # Dados de velocidades de envio por produto
 RATE_BY_PRODUCT = {
-    "GAS": 500,
-    "S10": 600,
-    "S500": 560,
-    "QAV": 240,
-    "QAV-A1": 240,
-    "OC": 300
+    "GASOLINA": 500,
+    "DIESEL S10": 600,
+    "DIESEL S500": 560,
+    "QAV-1 JET": 240,
+    "OCB1": 300
 }
 
 # Preferências de produtos por companhia
 PRODUCT_PRIORITY = {
-    "TSO": "S10", "DM": "S10", "FIC": "S10", "CJ": "S10", "TOR": "S10", "PTS": "S10",
-    "CRS": "S500", "TCT": "S500", "TRR": "S500"
+    "TRANSO": "DIESEL S10", "D'MAIS": "DIESEL S10", "FIC": "DIESEL S10", "RUFF/CJ": "DIESEL S10", "TORRÃO": "DIESEL S10", "PETROSUL": "DIESEL S10",
+    "CROSS": "DIESEL S500", "TCT": "DIESEL S500", "TERRANA": "DIESEL S500"
 }
 
 # Caminho do arquivo de dados históricos
@@ -25,7 +24,7 @@ HISTORICAL_DATA_PATH = "dados_revisados.csv"
 # Função para calcular tempo de bombeio com base no produto e companhia
 def calculate_bombeio_time(product, volume, company):
     rate = RATE_BY_PRODUCT.get(product, 500)
-    if product == "S10" and company in ["POO", "PET"]:
+    if product == "DIESEL S10" and company in ["POOL", "VIBRA"]:
         rate = 1200
     duration = volume / rate  # duração em horas
     return round(duration * 60)  # duração em minutos
@@ -97,8 +96,8 @@ num_companies = st.number_input("Quantas companhias irão receber produto?", min
 company_data = []
 for i in range(int(num_companies)):
     st.markdown(f"### Companhia {i+1}")
-    company = st.selectbox(f"Nome da Companhia {i+1}", ["POO", "PET", "SIM", "PTS", "FIC", "CJ", "TCT", "TRR", "TSO", "RM", "OPL", "CRS", "TOR", "DM", "SHE"], key=f"company_{i}")
-    product = st.selectbox(f"Produto {i+1}", ["GAS", "S10", "S500", "QAV", "QAV-A1", "OC"], key=f"product_{i}")
+    company = st.selectbox(f"Nome da Companhia {i+1}", ["POOL", "VIBRA", "SIMARELLI", "PETROSUL", "FIC", "RUFF/CJ", "TCT", "TERRANA", "TRANSO", "RM", "OPLA", "CROSS", "TORRÃO", "D'MAIS", "RAIZEN"], key=f"company_{i}")
+    product = st.selectbox(f"Produto {i+1}", ["GASOLINA", "DIESEL S10", "DIESEL S500", "QAV-1 JET", "OCB1"], key=f"product_{i}")
     volume = st.number_input(f"Volume (m³) a ser enviado {i+1}", min_value=0, step=1, key=f"volume_{i}")
     stock = st.selectbox(f"Companhia tem estoque? {i+1}", ["Sim", "Não"], key=f"stock_{i}")
     tanks = st.number_input(f"Quantidade de tanques {i+1}", min_value=1, step=1, key=f"tanks_{i}")
