@@ -114,8 +114,19 @@ num_companies = st.number_input("Quantas companhias irão receber produto?", min
 company_data = []
 for i in range(int(num_companies)):
     st.markdown(f"### Companhia {i+1}")
-    company = st.selectbox(f"Nome da Companhia {i+1}", ["POO", "PET", "SIM", "PTS", "FIC", "CJ", "TCT", "TRR", "TSO", "RM", "OPL", "CRS", "TOR", "DM", "SHE"], key=f"company_{i}", index=user_data.get(f"company_{i}", 0))
-    product = st.selectbox(f"Produto {i+1}", ["GAS", "S10", "S500", "QAV", "QAV-A1", "OC"], key=f"product_{i}", index=user_data.get(f"product_{i}", 0))
+    company_options = ["POO", "PET", "SIM", "PTS", "FIC", "CJ", "TCT", "TRR", "TSO", "RM", "OPL", "CRS", "TOR", "DM", "SHE"]
+    product_options = ["GAS", "S10", "S500", "QAV", "QAV-A1", "OC"]
+
+    company_index = user_data.get(f"company_{i}", 0)
+    if company_index >= len(company_options):
+        company_index = 0
+
+    product_index = user_data.get(f"product_{i}", 0)
+    if product_index >= len(product_options):
+        product_index = 0
+
+    company = st.selectbox(f"Nome da Companhia {i+1}", company_options, key=f"company_{i}", index=company_index)
+    product = st.selectbox(f"Produto {i+1}", product_options, key=f"product_{i}", index=product_index)
     volume = st.number_input(f"Volume (m³) a ser enviado {i+1}", min_value=0, step=1, key=f"volume_{i}", value=user_data.get(f"volume_{i}", 0))
     stock = st.selectbox(f"Companhia tem estoque? {i+1}", ["Sim", "Não"], key=f"stock_{i}", index=user_data.get(f"stock_{i}", 0))
     tanks = st.number_input(f"Quantidade de tanques {i+1}", min_value=1, step=1, key=f"tanks_{i}", value=user_data.get(f"tanks_{i}", 1))
@@ -133,8 +144,8 @@ for i in range(int(num_companies)):
     })
 
     # Salvar dados do usuário a cada entrada
-    user_data[f"company_{i}"] = company
-    user_data[f"product_{i}"] = product
+    user_data[f"company_{i}"] = company_index
+    user_data[f"product_{i}"] = product_index
     user_data[f"volume_{i}"] = volume
     user_data[f"stock_{i}"] = stock
     user_data[f"tanks_{i}"] = tanks
