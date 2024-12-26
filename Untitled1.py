@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import datetime
 import os
+from st_aggrid import AgGrid, GridOptionsBuilder, DataReturnMode, GridUpdateMode
 
 # Dados de velocidades de envio por produto
 RATE_BY_PRODUCT = {
@@ -18,6 +19,9 @@ PRODUCT_PRIORITY = {
     "TSO": "S10", "DM": "S10", "FIC": "S10", "CJ": "S10", "TOR": "S10", "PTS": "S10",
     "CRS": "S500", "TCT": "S500", "TRR": "S500"
 }
+
+# Caminho do arquivo de dados históricos
+HISTORICAL_DATA_PATH = "dados_revisados.csv"
 
 # Função para calcular tempo de bombeio com base no produto e companhia
 def calculate_bombeio_time(product, volume, company):
@@ -44,14 +48,29 @@ def adjust_product_priority(data):
 def rank_companies(data):
     def priority_score(row):
         score = 0
+        # Regra 1: Estoque (Máxima prioridade)
         if row["Estoque"] == "Não":
             score -= 1000
+
+        # Regra 2: Quantidade de tanques (Quanto menor, maior prioridade)
         score -= row["Tanques"] * 10
+
+        # Regra 3: Prioridade Adicional (quanto maior o nível, maior prioridade negativa)
         score -= row["Prioridade Adicional (Nível)"] * 50
+
         return score
 
     data["Prioridade"] = data.apply(priority_score, axis=1)
     return data.sort_values(by=["Prioridade", "ProductPriority"], ascending=True)
+
+# Função para atualizar dados históricos
+def update_historical_data(new_data):
+    if os.path.exists(HISTORICAL_DATA_PATH):
+        historical_data = pd.read_csv(HISTORICAL_DATA_PATH)
+        historical_data = pd.concat([historical_data, new_data], ignore_index=True)
+    else:
+        historical_data = new_data
+    historical_data.to_csv(HISTORICAL_DATA_PATH, index=False)
 
 # Inicialização da interface
 st.title("Organizador de Bombeios")
@@ -85,9 +104,12 @@ for i in range(int(num_companies)):
 if st.button("Organizar meu dia"):
     if len(company_data) > 0:
         df = pd.DataFrame(company_data)
+        # Ajustar a prioridade de produtos
         df = adjust_product_priority(df)
+        # Ranqueamento final
         ranked_df = rank_companies(df)
 
+        # Planejamento do horário dos bombeios
         start_time = datetime.datetime.combine(datetime.date.today(), datetime.time(0, 0))
         end_of_day = datetime.datetime.combine(datetime.date.today(), datetime.time(23, 59))
         schedule = []
@@ -107,29 +129,32 @@ if st.button("Organizar meu dia"):
                 "Fim": end_time.strftime("%H:%M"),
                 "Prioridade Adicional": row["Prioridade Adicional"]
             })
+            # Adiciona intervalo de 10 minutos entre bombeios
             start_time = end_time + datetime.timedelta(minutes=10)
 
         # Exibição dos resultados
         st.subheader("Bombeios Organizados por Prioridade e Horário")
         schedule_df = pd.DataFrame(schedule)
 
-        # Exibição dinâmica com botões de editar e remover
-        edited_schedule = schedule_df.copy()
-        for index, row in schedule_df.iterrows():
-            col1, col2, col3 = st.columns([3, 1, 1])
-            with col1:
-                st.text(f"{row['Companhia']} | {row['Produto']} | {row['Volume']} m³")
-            with col2:
-                if st.button(f"Editar {index}", key=f"edit_{index}"):
-                    # Permitir editar os valores
-                    new_volume = st.number_input(f"Volume para {row['Companhia']}", value=row["Volume"], step=1, key=f"volume_edit_{index}")
-                    edited_schedule.at[index, "Volume"] = new_volume
-            with col3:
-                if st.button(f"Remover {index}", key=f"remove_{index}"):
-                    edited_schedule = edited_schedule.drop(index)
+        # Usando AgGrid para edição e remoção
+        gb = GridOptionsBuilder.from_dataframe(schedule_df)
+        gb.configure_pagination()
+        gb.configure_default_column(editable=True)
+        gb.configure_selection("single", use_checkbox=True)
+        grid_options = gb.build()
 
-        st.subheader("Tabela Atualizada")
-        st.dataframe(edited_schedule.reset_index(drop=True))
+        response = AgGrid(
+            schedule_df,
+            gridOptions=grid_options,
+            update_mode=GridUpdateMode.MODEL_CHANGED,
+            data_return_mode=DataReturnMode.FILTERED_AND_SORTED,
+        )
+
+        edited_df = response["data"]
+
+        if st.button("Salvar Alterações"):
+            update_historical_data(edited_df)
+            st.success("Alterações salvas com sucesso!")
+
     else:
         st.warning("Por favor, insira os dados das companhias.")
-
