@@ -18,6 +18,24 @@ PRODUCT_PRIORITY = {
     "CROSS": "DIESEL S500", "TCT": "DIESEL S500", "TERRANA": "DIESEL S500"
 }
 
+# Quantidade de tanques por produto e companhia
+TANKS_BY_COMPANY_AND_PRODUCT = {
+    "TORRÃO": {"GASOLINA": 1, "DIESEL S10": 1, "DIESEL S500": 1},
+    "FIC": {"GASOLINA": 2, "DIESEL S10": 2, "DIESEL S500": 1},
+    "TRANSO": {"GASOLINA": 2, "DIESEL S10": 3, "DIESEL S500": 3},
+    "TERRANA": {"GASOLINA": 2, "DIESEL S10": 2, "DIESEL S500": 2},
+    "D'MAIS": {"GASOLINA": 2, "DIESEL S10": 1, "DIESEL S500": 1},
+    "PETROSUL": {"GASOLINA": 1, "DIESEL S10": 1, "DIESEL S500": 1},
+    "TCT": {"GASOLINA": 1, "DIESEL S10": 2, "DIESEL S500": 2},
+    "SIMARELLI": {"GASOLINA": 1, "DIESEL S10": 1, "DIESEL S500": 2},
+    "RUFF/CJ": {"GASOLINA": 2, "DIESEL S10": 2, "DIESEL S500": 1},
+    "RM": {"GASOLINA": 1, "DIESEL S10": 1, "DIESEL S500": 1},
+    "CROSS": {"GASOLINA": 1, "DIESEL S10": 1, "DIESEL S500": 1},
+    "OPLA": {"DIESEL S10": 1, "QAV-1 JET": 1},
+    "RAIZEN": {"QAV-1 JET": 3},
+    "POOL": {"GASOLINA": 2, "DIESEL S10": 2, "DIESEL S500": 2, "OCB1": 1}
+}
+
 # Caminho do arquivo de dados históricos
 HISTORICAL_DATA_PATH = "dados_revisados.csv"
 
@@ -51,7 +69,10 @@ def rank_companies(data):
             score -= 1000
 
         # Regra 2: Quantidade de tanques (Quanto menor, maior prioridade)
-        score -= row["Tanques"] * 10
+        company = row["Companhia"]
+        product = row["Produto"]
+        tanks = TANKS_BY_COMPANY_AND_PRODUCT.get(company, {}).get(product, 1)  # Padrão de 1 tanque
+        score -= tanks * 10
 
         # Regra 3: Prioridade Adicional (quanto maior o nível, maior prioridade negativa)
         score -= row["Prioridade Adicional (Nível)"] * 50
@@ -70,22 +91,6 @@ def update_historical_data(new_data):
         historical_data = new_data
     historical_data.to_csv(HISTORICAL_DATA_PATH, index=False)
 
-# Função para carregar dados históricos
-def load_historical_data():
-    if os.path.exists(HISTORICAL_DATA_PATH):
-        return pd.read_csv(HISTORICAL_DATA_PATH)
-    return pd.DataFrame()
-
-# Função para ajustar taxas com base em dados históricos
-def adjust_rates_with_historical_data(historical_data):
-    if not historical_data.empty:
-        global RATE_BY_PRODUCT
-        avg_rates = historical_data.groupby("Produto").apply(
-            lambda x: (x["Volume"].sum() / ((x["Fim"] - x["Início"]).dt.total_seconds().sum() / 3600))
-        )
-        for product, rate in avg_rates.items():
-            RATE_BY_PRODUCT[product] = rate
-
 # Inicialização da interface
 st.title("Organizador de Bombeios")
 
@@ -96,11 +101,10 @@ num_companies = st.number_input("Quantas companhias irão receber produto?", min
 company_data = []
 for i in range(int(num_companies)):
     st.markdown(f"### Companhia {i+1}")
-    company = st.selectbox(f"Nome da Companhia {i+1}", ["POOL", "VIBRA", "SIMARELLI", "PETROSUL", "FIC", "RUFF/CJ", "TCT", "TERRANA", "TRANSO", "RM", "OPLA", "CROSS", "TORRÃO", "D'MAIS", "RAIZEN"], key=f"company_{i}")
+    company = st.selectbox(f"Nome da Companhia {i+1}", list(TANKS_BY_COMPANY_AND_PRODUCT.keys()), key=f"company_{i}")
     product = st.selectbox(f"Produto {i+1}", ["GASOLINA", "DIESEL S10", "DIESEL S500", "QAV-1 JET", "OCB1"], key=f"product_{i}")
     volume = st.number_input(f"Volume (m³) a ser enviado {i+1}", min_value=0, step=1, key=f"volume_{i}")
     stock = st.selectbox(f"Companhia tem estoque? {i+1}", ["Sim", "Não"], key=f"stock_{i}")
-    tanks = st.number_input(f"Quantidade de tanques {i+1}", min_value=1, step=1, key=f"tanks_{i}")
     additional_priority = st.text_input(f"Prioridade Adicional {i+1} (Operacional ou Cliente)", key=f"add_priority_{i}")
     additional_priority_level = st.slider(f"Nível da Prioridade Adicional {i+1} (0-10)", min_value=0, max_value=10, key=f"priority_level_{i}")
 
@@ -109,7 +113,6 @@ for i in range(int(num_companies)):
         "Produto": product,
         "Volume": volume,
         "Estoque": stock,
-        "Tanques": tanks,
         "Prioridade Adicional": additional_priority,
         "Prioridade Adicional (Nível)": additional_priority_level
     })
@@ -147,9 +150,12 @@ if st.button("Organizar meu dia"):
             start_time = end_time + datetime.timedelta(minutes=10)
 
         # Exibição dos resultados
-        st.subheader("Bombeios Organizados por Prioridade e Horário")
         schedule_df = pd.DataFrame(schedule)
+        st.subheader("Planejamento do Dia")
         st.dataframe(schedule_df)
+
+        # Atualização do histórico
+        update_historical_data(schedule_df)
 
         # Entrada dos dados reais
         st.subheader("Entrada dos dados reais ao final do dia")
