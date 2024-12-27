@@ -157,17 +157,35 @@ if st.button("Organizar meu dia"):
         # Atualização do histórico
         update_historical_data(schedule_df)
 
-        # Entrada dos dados reais
+        # Entrada dos dados reais ao final do dia
         st.subheader("Entrada dos dados reais ao final do dia")
-        for i, row in schedule_df.iterrows():
-            real_start = st.time_input(f"Horário real de início ({row['Companhia']})", key=f"real_start_{i}")
-            real_end = st.time_input(f"Horário real de término ({row['Companhia']})", key=f"real_end_{i}")
-
-        if st.button("Salvar Dados Reais"):
-            schedule_df["Início Real"] = schedule_df["Início"]
-            schedule_df["Fim Real"] = schedule_df["Fim"]
-            update_historical_data(schedule_df)
-            st.success("Dados reais salvos com sucesso!")
-
-    else:
-        st.warning("Por favor, insira os dados das companhias.")
+        
+        if "schedule_df" in locals() or "schedule_df" in globals():
+            real_data = []
+        
+            for i, row in schedule_df.iterrows():
+                st.markdown(f"### {row['Companhia']} - {row['Produto']}")
+                real_start = st.time_input(f"Horário real de início ({row['Companhia']} - {row['Produto']})", key=f"real_start_{i}")
+                real_end = st.time_input(f"Horário real de término ({row['Companhia']} - {row['Produto']})", key=f"real_end_{i}")
+                
+                # Armazenando os dados reais no formato correto
+                real_data.append({
+                    "Companhia": row["Companhia"],
+                    "Produto": row["Produto"],
+                    "Início Planejado": row["Início"],
+                    "Fim Planejado": row["Fim"],
+                    "Início Real": real_start.strftime("%H:%M"),
+                    "Fim Real": real_end.strftime("%H:%M"),
+                })
+        
+            if st.button("Salvar Dados Reais"):
+                # Convertendo os dados reais para um DataFrame
+                real_data_df = pd.DataFrame(real_data)
+        
+                # Salvando no arquivo histórico
+                update_historical_data(real_data_df)
+        
+                st.success("Dados reais salvos com sucesso!")
+                st.dataframe(real_data_df)  # Exibindo os dados reais salvos
+        else:
+            st.warning("Por favor, organize o dia antes de inserir os dados reais.")
