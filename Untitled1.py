@@ -96,8 +96,8 @@ num_companies = st.number_input("Quantas companhias irão receber produto?", min
 company_data = []
 for i in range(int(num_companies)):
     st.markdown(f"### Companhia {i+1}")
-    company = st.selectbox(f"Nome da Companhia {i+1}", ["POO", "PET", "SIM", "PTS", "FIC", "CJ", "TCT", "TRR", "TSO", "RM", "OPL", "CRS", "TOR", "DM", "SHE"], key=f"company_{i}")
-    product = st.selectbox(f"Produto {i+1}", ["GAS", "S10", "S500", "QAV", "QAV-A1", "OC"], key=f"product_{i}")
+    company = st.selectbox(f"Nome da Companhia {i+1}", ["POOL", "VIBRA", "SIMARELLI", "PETROSUL", "FIC", "RUFF/CJ", "TCT", "TERRANA", "TRANSO", "RM", "OPLA", "CROSS", "TORRÃO", "D'MAIS", "RAIZEN"], key=f"company_{i}")
+    product = st.selectbox(f"Produto {i+1}", ["GASOLINA", "DIESEL S10", "DIESEL S500", "QAV-1 JET", "OCB1"], key=f"product_{i}")
     volume = st.number_input(f"Volume (m³) a ser enviado {i+1}", min_value=0, step=1, key=f"volume_{i}")
     stock = st.selectbox(f"Companhia tem estoque? {i+1}", ["Sim", "Não"], key=f"stock_{i}")
     tanks = st.number_input(f"Quantidade de tanques {i+1}", min_value=1, step=1, key=f"tanks_{i}")
