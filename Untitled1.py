@@ -33,7 +33,8 @@ TANKS_BY_COMPANY_AND_PRODUCT = {
     "CROSS": {"GASOLINA": 1, "DIESEL S10": 1, "DIESEL S500": 1},
     "OPLA": {"DIESEL S10": 1, "QAV-1 JET": 1},
     "RAIZEN": {"QAV-1 JET": 3},
-    "POOL": {"GASOLINA": 2, "DIESEL S10": 2, "DIESEL S500": 2, "OCB1": 1}
+    "POOL": {"GASOLINA": 2, "DIESEL S10": 2, "DIESEL S500": 2, "OCB1": 1},
+    "VIBRA": {"GASOLINA": 2, "DIESEL S10": 2, "DIESEL S500": 2, "OCB1": 1, "QAV-1 JET": 3}
 }
 
 # Caminho do arquivo de dados históricos
