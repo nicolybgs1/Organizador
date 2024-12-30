@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import datetime
+import openpyxl
 
 # Dados de velocidades de envio por produto
 RATE_BY_PRODUCT = {
