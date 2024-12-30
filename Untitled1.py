@@ -1,8 +1,6 @@
 import streamlit as st
 import pandas as pd
 import datetime
-import os
-import openpyxl
 
 # Dados de velocidades de envio por produto
 RATE_BY_PRODUCT = {
@@ -38,31 +36,20 @@ TANKS_BY_COMPANY_AND_PRODUCT = {
     "VIBRA": {"GASOLINA": 2, "DIESEL S10": 2, "DIESEL S500": 2, "OCB1": 1, "QAV-1 JET": 3}
 }
 
-# Caminho do arquivo de dados históricos
-HISTORICAL_DATA_PATH = "dados_revisados.csv"
-
-# Função para calcular tempo de bombeio com base no produto e companhia
-def calculate_bombeio_time(product, volume, company):
+# Função para calcular tempo de bombeio com base no produto e volume
+def calculate_bombeio_time(product, volume):
     rate = RATE_BY_PRODUCT.get(product, 500)
-    if product == "DIESEL S10" and company in ["POOL", "VIBRA"]:
-        rate = 1200
+    if volume <= 0:  # Verifica se o volume é inválido
+        return 0
     duration = volume / rate  # duração em horas
-    return round(duration * 60)  # duração em minutos
+    return duration * 60  # duração em minutos
 
-# Função para ajustar prioridade do produto baseado nas preferências
-def adjust_product_priority(data):
-    def product_priority(row):
-        company = row["Companhia"]
-        product = row["Produto"]
-        if company in PRODUCT_PRIORITY:
-            preferred_product = PRODUCT_PRIORITY[company]
-            return 0 if product == preferred_product else 1
-        return 2  # Caso não haja preferência
+# Função para calcular o horário de fim com base no horário de início e tempo de bombeio
+def calculate_end_time(start_time, duration_minutes):
+    end_time = start_time + datetime.timedelta(minutes=duration_minutes)
+    return end_time
 
-    data["ProductPriority"] = data.apply(product_priority, axis=1)
-    return data.sort_values(by=["ProductPriority"], ascending=True)
-
-# Função para priorizar companhias
+# Função para priorizar companhias com base nas regras
 def rank_companies(data):
     def priority_score(row):
         score = 0
@@ -71,104 +58,123 @@ def rank_companies(data):
             score -= 1000
 
         # Regra 2: Quantidade de tanques (Quanto menor, maior prioridade)
-        company = row["Companhia"]
-        product = row["Produto"]
-        tanks = TANKS_BY_COMPANY_AND_PRODUCT.get(company, {}).get(product, 1)  # Padrão de 1 tanque
-        score -= tanks * 10
+        score -= row["Tanques"] * 10
 
         # Regra 3: Prioridade Adicional (quanto maior o nível, maior prioridade negativa)
         score -= row["Prioridade Adicional (Nível)"] * 50
 
+        # Regra 4: Preferência de produto por companhia (Prioridade adicional)
+        preferred_product = PRODUCT_PRIORITY.get(row["Companhia"])
+        
+        if preferred_product:
+            if row["Produto"] == preferred_product:
+                score -= 500  # O produto preferido recebe maior prioridade
+            else:
+                score += 500  # Outros produtos têm menor prioridade
+        else:
+            score += 1000  # Caso não haja preferência, penaliza mais
+
         return score
 
     data["Prioridade"] = data.apply(priority_score, axis=1)
-    return data.sort_values(by=["Prioridade", "ProductPriority"], ascending=True)
+    
+    # Corrigido para usar apenas "Prioridade" na ordenação
+    return data.sort_values(by=["Prioridade"], ascending=True)
+    
+# Função para gerar o planejamento do dia com base nas prioridades e volumes
+def generate_bombeio_schedule(data):
+    schedule = []
+    start_time = datetime.datetime.strptime("00:00", "%H:%M")  # O primeiro bombeio começa às 00:00
+    
+    # Classificar os dados com base na priorização das companhias
+    data = rank_companies(data)
+    
+    for i, row in data.iterrows():
+        product = row['Produto']
+        volume = row['Volume']
+        company = row['Companhia']
+        
+        # Calcular o tempo de bombeio para esse produto e volume
+        duration_minutes = calculate_bombeio_time(product, volume)
+        
+        # Calcular horário de fim com base no horário de início atual
+        end_time = start_time + datetime.timedelta(minutes=duration_minutes)
+        
+        # Verificar se o bombeio ultrapassa o limite de 23:59
+        if end_time > datetime.datetime.strptime("23:59", "%H:%M"):
+            print(f"Bombeio para {company} às {start_time.strftime('%H:%M')} não pode ser agendado (ultrapassa o limite do dia).")
+            break
+        
+        # Adicionar ao planejamento
+        schedule.append({
+            'Companhia': company,
+            'Produto': product,
+            'Volume': volume,
+            'Hora de Início': start_time.strftime("%H:%M"),
+            'Hora de Fim': end_time.strftime("%H:%M"),
+        })
+        
+        # Atualizar o horário de início para o próximo bombeio, respeitando o intervalo de 10 minutos
+        start_time = end_time + datetime.timedelta(minutes=10)
+    
+    return pd.DataFrame(schedule)
 
-# Função para atualizar dados históricos
-def update_historical_data(new_data):
-    if os.path.exists(HISTORICAL_DATA_PATH):
-        historical_data = pd.read_csv(HISTORICAL_DATA_PATH)
-        historical_data = pd.concat([historical_data, new_data], ignore_index=True)
-    else:
-        historical_data = new_data
-    historical_data.to_csv(HISTORICAL_DATA_PATH, index=False)
 
 # Inicialização da interface
-st.title("Organizador de Bombeios")
+st.title("Planejamento e Registro de Bombeios")
 
 # Upload de arquivo Excel
 uploaded_file = st.file_uploader("Envie o arquivo Excel com os dados:", type=["xlsx"])
 
 if uploaded_file is not None:
-    # Leitura do arquivo Excel
-    input_data = pd.read_excel(uploaded_file)
-    st.write("Dados carregados com sucesso:")
-    st.dataframe(input_data)
-
-    # Processamento dos dados carregados
-    input_data = adjust_product_priority(input_data)
-    ranked_data = rank_companies(input_data)
-
-    # Planejamento do horário dos bombeios
-    start_time = datetime.datetime.combine(datetime.date.today(), datetime.time(0, 0))
-    end_of_day = datetime.datetime.combine(datetime.date.today(), datetime.time(23, 59))
-    schedule = []
-    for _, row in ranked_data.iterrows():
-        duration = calculate_bombeio_time(row["Produto"], row["Volume"], row["Companhia"])
-        end_time = start_time + datetime.timedelta(minutes=duration)
-
-        if end_time > end_of_day:
-            st.warning(f"Não foi possível programar o bombeio para a companhia {row['Companhia']} devido ao limite de tempo diário.")
-            break
-
-        schedule.append({
-            "Companhia": row["Companhia"],
-            "Produto": row["Produto"],
-            "Volume": row["Volume"],
-            "Início": start_time.strftime("%H:%M"),
-            "Fim": end_time.strftime("%H:%M"),
-            "Prioridade Adicional": row["Prioridade Adicional"]
-        })
-        # Adiciona intervalo de 10 minutos entre bombeios
-        start_time = end_time + datetime.timedelta(minutes=10)
-
-    # Exibição dos resultados
-    schedule_df = pd.DataFrame(schedule)
-    st.subheader("Planejamento do Dia")
-    st.dataframe(schedule_df)
-
-    # Atualização do histórico
-    update_historical_data(schedule_df)
-
-    # Entrada dos dados reais ao final do dia
-    st.subheader("Entrada dos dados reais ao final do dia")
+    # Leitura das planilhas do arquivo Excel
+    excel_data = pd.ExcelFile(uploaded_file)
     
-    if "schedule_df" in locals() or "schedule_df" in globals():
-        real_data = []
+    # Iteração sobre cada planilha (produto)
+    all_data = []
+    for sheet_name in excel_data.sheet_names:
+        # Leitura dos dados de cada planilha (produto)
+        sheet_data = excel_data.parse(sheet_name)
+        sheet_data["Produto"] = sheet_name  # Adiciona uma coluna 'Produto' com o nome da planilha
+        
+        # Adiciona os dados da planilha à lista
+        all_data.append(sheet_data)
     
-        for i, row in schedule_df.iterrows():
-            st.markdown(f"### {row['Companhia']} - {row['Produto']}")
-            real_start = st.time_input(f"Horário real de início ({row['Companhia']} - {row['Produto']})", key=f"real_start_{i}")
-            real_end = st.time_input(f"Horário real de término ({row['Companhia']} - {row['Produto']})", key=f"real_end_{i}")
-            
-            # Armazenando os dados reais no formato correto
-            real_data.append({
-                "Companhia": row["Companhia"],
-                "Produto": row["Produto"],
-                "Início Planejado": row["Início"],
-                "Fim Planejado": row["Fim"],
-                "Início Real": real_start.strftime("%H:%M"),
-                "Fim Real": real_end.strftime("%H:%M"),
-            })
+    # Combina todos os dados em um único DataFrame
+    input_data = pd.concat(all_data, ignore_index=True)
     
-        if st.button("Salvar Dados Reais"):
-            # Convertendo os dados reais para um DataFrame
-            real_data_df = pd.DataFrame(real_data)
+    # Filtra os dados para garantir que apenas volumes válidos (maiores que 0) sejam considerados
+    valid_data = input_data[input_data["Volume"] > 0]
+
+    # Exibe os dados filtrados
+    st.write("Dados filtrados (Volume > 0):")
+    st.dataframe(valid_data)
     
-            # Salvando no arquivo histórico
-            update_historical_data(real_data_df)
-    
-            st.success("Dados reais salvos com sucesso!")
-            st.dataframe(real_data_df)  # Exibindo os dados reais salvos
-    else:
-        st.warning("Por favor, organize o dia antes de inserir os dados reais.")
+    # Adicionar colunas interativas de estoque e prioridade
+    valid_data['Estoque'] = valid_data['Produto'].apply(lambda x: 'Sim' if x in ['GASOLINA', 'DIESEL S10', 'DIESEL S500'] else 'Não')
+    valid_data['Prioridade Adicional (Nível)'] = valid_data['Companhia'].apply(lambda x: 3 if x in PRODUCT_PRIORITY else 1)
+    valid_data['Tanques'] = valid_data.apply(lambda row: TANKS_BY_COMPANY_AND_PRODUCT.get(row['Companhia'], {}).get(row['Produto'], 1), axis=1)
+
+    # Exibe a tabela interativa para edição dos campos de estoque e prioridade
+    st.write("Dados com informações de estoque e prioridade (Edite os valores):")
+    edited_data = st.data_editor(valid_data, num_rows="dynamic", use_container_width=True)
+
+    # Agrupar os dados por companhia e produto
+    grouped_data = edited_data.groupby(['Companhia', 'Produto']).apply(generate_bombeio_schedule).reset_index(drop=True)
+
+    # Exibe o planejamento de bombeios para cada combinação de companhia e produto
+    st.write("Planejamento de Bombeios por Produto e Companhia:")
+    st.dataframe(grouped_data, use_container_width=True)
+
+    # Permitir que o usuário edite diretamente os dados reais de bombeio
+    st.write("Dados Reais de Bombeio (Edite os horários reais):")
+    edited_bombeio_schedule = st.data_editor(grouped_data, num_rows="dynamic", use_container_width=True)
+
+    # Permitir download dos dados reais de bombeio
+    st.download_button(
+        label="Baixar os dados reais de bombeio",
+        data=edited_bombeio_schedule.to_csv(index=False).encode('utf-8'),
+        file_name="dados_reais_bombeio.csv",
+        mime="text/csv"
+    )
+    st.success("Dados reais de bombeio salvos com sucesso!")
