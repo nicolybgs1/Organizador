@@ -85,6 +85,7 @@ def rank_companies(data):
 def generate_bombeio_schedule(data, start_time):
     schedule = []
     end_of_day = datetime.datetime.strptime("23:59", "%H:%M")
+    bombeio_interval = datetime.timedelta(minutes=10)
     
     # Criar a coluna 'Tanques' com base no dicionário TANKS_BY_COMPANY_AND_PRODUCT
     def get_tank_count(row):
@@ -123,7 +124,7 @@ def generate_bombeio_schedule(data, start_time):
         })
         
         # Atualizar o horário de início para o próximo bombeio, respeitando o intervalo de 10 minutos
-        start_time = end_time + datetime.timedelta(minutes=10)
+        start_time = end_time + bombeio_interval
         
         # Garantir que o intervalo de 10 minutos seja respeitado
         if start_time.minute % 10 != 0:
