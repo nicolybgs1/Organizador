@@ -62,7 +62,8 @@ def rank_companies(data):
         score -= row["Tanques"] * 10
 
         # Regra 3: Prioridade Adicional (quanto maior o nível, maior prioridade negativa)
-        score -= row["Prioridade Adicional (Nível)"] * 50
+        prioridade_adicional = row["Prioridade Adicional (Nível)"] if pd.notna(row["Prioridade Adicional (Nível)"]) else 1
+        score -= prioridade_adicional * 50
 
         # Regra 4: Preferência de produto por companhia (Prioridade adicional)
         preferred_product = PRODUCT_PRIORITY.get(row["Companhia"])
@@ -78,14 +79,20 @@ def rank_companies(data):
         return score
 
     data["Prioridade"] = data.apply(priority_score, axis=1)
-    
-    # Corrigido para usar apenas "Prioridade" na ordenação
     return data.sort_values(by=["Prioridade"], ascending=True)
-    
+
 # Função para gerar o planejamento do dia com base nas prioridades e volumes
-def generate_bombeio_schedule(data):
+def generate_bombeio_schedule(data, start_time):
     schedule = []
-    start_time = datetime.datetime.strptime("00:00", "%H:%M")  # O primeiro bombeio começa às 00:00
+    end_of_day = datetime.datetime.strptime("23:59", "%H:%M")
+    
+    # Criar a coluna 'Tanques' com base no dicionário TANKS_BY_COMPANY_AND_PRODUCT
+    def get_tank_count(row):
+        company = row['Companhia']
+        product = row['Produto']
+        return TANKS_BY_COMPANY_AND_PRODUCT.get(company, {}).get(product, 0)
+
+    data["Tanques"] = data.apply(get_tank_count, axis=1)
     
     # Classificar os dados com base na priorização das companhias
     data = rank_companies(data)
@@ -99,13 +106,13 @@ def generate_bombeio_schedule(data):
         duration_minutes = calculate_bombeio_time(product, volume)
         
         # Calcular horário de fim com base no horário de início atual
-        end_time = start_time + datetime.timedelta(minutes=duration_minutes)
+        end_time = calculate_end_time(start_time, duration_minutes)
         
-        # Verificar se o bombeio ultrapassa o limite de 23:59
-        if end_time > datetime.datetime.strptime("23:59", "%H:%M"):
-            print(f"Bombeio para {company} às {start_time.strftime('%H:%M')} não pode ser agendado (ultrapassa o limite do dia).")
-            break
-        
+        # Verificar se o fim do bombeio ultrapassa 23:59
+        if end_time > end_of_day:
+            # Ajustar para que o bombeio termine até 23:59
+            end_time = end_of_day
+            
         # Adicionar ao planejamento
         schedule.append({
             'Companhia': company,
@@ -117,8 +124,16 @@ def generate_bombeio_schedule(data):
         
         # Atualizar o horário de início para o próximo bombeio, respeitando o intervalo de 10 minutos
         start_time = end_time + datetime.timedelta(minutes=10)
+        
+        # Garantir que o intervalo de 10 minutos seja respeitado
+        if start_time.minute % 10 != 0:
+            start_time = start_time + datetime.timedelta(minutes=(10 - start_time.minute % 10))
+        
+        # Verificar se o próximo bombeio ultrapassa o limite de 23:59
+        if start_time > end_of_day:
+            break  # Interromper o planejamento caso o próximo início ultrapasse 23:59
     
-    return pd.DataFrame(schedule)
+    return pd.DataFrame(schedule), start_time
 
 
 # Inicialização da interface
@@ -152,24 +167,33 @@ if uploaded_file is not None:
     st.dataframe(valid_data)
     
     # Adicionar colunas interativas de estoque e prioridade
-    valid_data['Estoque'] = valid_data['Produto'].apply(lambda x: 'Sim' if x in ['GASOLINA', 'DIESEL S10', 'DIESEL S500'] else 'Não')
+    valid_data['Estoque'] = valid_data['Produto'].apply(lambda x: 'Sim' if x in ['GASOLINA', 'DIESEL S10', 'DIESEL S500', 'QAV-1 JET','OCB1'] else 'Não')
     valid_data['Prioridade Adicional (Nível)'] = valid_data['Companhia'].apply(lambda x: 3 if x in PRODUCT_PRIORITY else 1)
-    valid_data['Tanques'] = valid_data.apply(lambda row: TANKS_BY_COMPANY_AND_PRODUCT.get(row['Companhia'], {}).get(row['Produto'], 1), axis=1)
 
     # Exibe a tabela interativa para edição dos campos de estoque e prioridade
     st.write("Dados com informações de estoque e prioridade (Edite os valores):")
     edited_data = st.data_editor(valid_data, num_rows="dynamic", use_container_width=True)
 
-    # Agrupar os dados por companhia e produto
-    grouped_data = edited_data.groupby(['Companhia', 'Produto']).apply(generate_bombeio_schedule).reset_index(drop=True)
+    # Inicializar o horário de início
+    initial_start_time = datetime.datetime.strptime("00:00", "%H:%M")
+    
+    # Agrupar os dados por companhia e produto e gerar o planejamento
+    grouped_data = []
+    for _, group in edited_data.groupby(['Companhia', 'Produto']):
+        # Usar o horário atualizado retornado pela função
+        schedule, initial_start_time = generate_bombeio_schedule(group, initial_start_time)
+        grouped_data.append(schedule)
+    
+    # Combinar todos os resultados do planejamento em um único DataFrame
+    final_schedule = pd.concat(grouped_data, ignore_index=True)
 
-    # Exibe o planejamento de bombeios para cada combinação de companhia e produto
+    # Exibe o planejamento de bombeios
     st.write("Planejamento de Bombeios por Produto e Companhia:")
-    st.dataframe(grouped_data, use_container_width=True)
+    st.dataframe(final_schedule, use_container_width=True)
 
     # Permitir que o usuário edite diretamente os dados reais de bombeio
     st.write("Dados Reais de Bombeio (Edite os horários reais):")
-    edited_bombeio_schedule = st.data_editor(grouped_data, num_rows="dynamic", use_container_width=True)
+    edited_bombeio_schedule = st.data_editor(final_schedule, num_rows="dynamic", use_container_width=True)
 
     # Permitir download dos dados reais de bombeio
     st.download_button(
